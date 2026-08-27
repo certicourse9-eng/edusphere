@@ -1,0 +1,71 @@
+.wrap {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(40px);
+  opacity: 0.45;
+}
+
+.a {
+  width: 280px;
+  height: 280px;
+  background: var(--primary);
+  top: -60px;
+  left: -40px;
+  animation: float-a 12s ease-in-out infinite;
+}
+
+.b {
+  width: 220px;
+  height: 220px;
+  background: var(--teal);
+  top: 20px;
+  right: 10%;
+  animation: float-b 14s ease-in-out infinite;
+}
+
+.c {
+  width: 200px;
+  height: 200px;
+  background: var(--pink);
+  bottom: -80px;
+  left: 30%;
+  animation: float-c 16s ease-in-out infinite;
+}
+
+@keyframes float-a {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(30px, 20px);
+  }
+}
+
+@keyframes float-b {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(-20px, 30px);
+  }
+}
+
+@keyframes float-c {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(20px, -20px);
+  }
+}

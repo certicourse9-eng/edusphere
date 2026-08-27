@@ -1,0 +1,79 @@
+.icon {
+  display: inline-flex;
+  font-size: 22px;
+  line-height: 1;
+  transform-origin: center;
+}
+
+.spin {
+  animation: spin 3.5s linear infinite;
+}
+
+.bounce {
+  animation: bounce 1.4s ease-in-out infinite;
+}
+
+.wiggle {
+  animation: wiggle 1.8s ease-in-out infinite;
+}
+
+.pulse {
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+.flip {
+  animation: flip 2.6s ease-in-out infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes wiggle {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-8deg);
+  }
+  75% {
+    transform: rotate(8deg);
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.15);
+  }
+}
+
+@keyframes flip {
+  0%,
+  80%,
+  100% {
+    transform: rotateY(0deg);
+  }
+  90% {
+    transform: rotateY(180deg);
+  }
+}

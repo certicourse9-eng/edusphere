@@ -1,0 +1,176 @@
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 24px;
+}
+
+.panel h2 {
+  font-size: 19px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.sub {
+  color: var(--text-soft);
+  font-size: 13.5px;
+  margin: 0 0 18px;
+}
+
+.statsBar {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.stat {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px 20px;
+  flex: 1 1 150px;
+}
+
+.statValue {
+  font-family: var(--font-sora), sans-serif;
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.statLabel {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-soft);
+  font-family: var(--font-mono), monospace;
+  margin-top: 2px;
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.table thead th {
+  text-align: left;
+  font-family: var(--font-mono), monospace;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-soft);
+  padding: 10px 14px;
+  border-bottom: 2px solid var(--text);
+  white-space: nowrap;
+}
+
+.caretCol {
+  width: 18px;
+}
+
+.row {
+  cursor: pointer;
+  border-bottom: 1px solid var(--line);
+}
+
+.row:hover {
+  background: var(--bg);
+}
+
+.row td {
+  padding: 12px 14px;
+  vertical-align: middle;
+}
+
+.caret {
+  width: 18px;
+  color: var(--text-soft);
+  font-size: 11px;
+}
+
+.studentId {
+  font-family: var(--font-mono), monospace;
+  font-weight: 600;
+}
+
+.fileName {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gradePill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  font-family: var(--font-mono), monospace;
+  font-weight: 700;
+  font-size: 12.5px;
+  margin-right: 8px;
+}
+
+.miniScore {
+  font-family: var(--font-mono), monospace;
+  font-weight: 600;
+}
+
+.good {
+  background: rgba(47, 191, 113, 0.14);
+  color: var(--green);
+}
+
+.moderate {
+  background: rgba(245, 166, 35, 0.14);
+  color: var(--amber);
+}
+
+.weak {
+  background: rgba(255, 107, 107, 0.14);
+  color: var(--coral);
+}
+
+.detailRow td {
+  padding: 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.exportBtn {
+  margin-top: 18px;
+  padding: 10px 16px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--text);
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font-sora), sans-serif;
+}
+
+.exportBtn:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.exportBtn:disabled {
+  color: var(--text-soft);
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .statsBar {
+    flex-direction: column;
+  }
+}
