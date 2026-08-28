@@ -71,6 +71,7 @@ function mismatchResult(selectedSubject: string, detectedSubject: string): Gradi
     totalScore: 0,
     maxTotal: 0,
     detectedSubject,
+    annotations: [],
     error: `Subject mismatch: this sheet looks like a ${detectedSubject} paper, but ${selectedSubject} was selected. Re-upload with the correct subject selected, or choose "${GENERAL_SUBJECT}" to grade it anyway.`
   };
 }

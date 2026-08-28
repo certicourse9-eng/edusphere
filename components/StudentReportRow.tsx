@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import styles from './StudentReportRow.module.css';
+import AnnotatedPageView from './AnnotatedPageView';
 import ScoreRing from './ScoreRing';
 import SubjectIcon from './SubjectIcon';
 import TeacherFeedbackBox from './TeacherFeedbackBox';
@@ -14,7 +15,7 @@ interface StudentReportRowProps {
 }
 
 export default function StudentReportRow({ file, onTeacherFeedbackChange }: StudentReportRowProps) {
-  const [tab, setTab] = useState<'overview' | 'questions' | 'pdf' | 'ocr'>('overview');
+  const [tab, setTab] = useState<'overview' | 'questions' | 'annotated' | 'pdf' | 'ocr'>('overview');
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -39,6 +40,11 @@ export default function StudentReportRow({ file, onTeacherFeedbackChange }: Stud
         <button className={tab === 'questions' ? styles.activeTab : ''} onClick={() => setTab('questions')}>
           Questions
         </button>
+        {file.ocrPages && file.ocrPages.length > 0 && (
+          <button className={tab === 'annotated' ? styles.activeTab : ''} onClick={() => setTab('annotated')}>
+            Annotated paper
+          </button>
+        )}
         <button className={tab === 'pdf' ? styles.activeTab : ''} onClick={() => setTab('pdf')}>
           Original PDF
         </button>
@@ -129,6 +135,10 @@ export default function StudentReportRow({ file, onTeacherFeedbackChange }: Stud
             );
           })}
         </div>
+      )}
+
+      {tab === 'annotated' && file.ocrPages && (
+        <AnnotatedPageView pages={file.ocrPages} annotations={r.annotations} />
       )}
 
       {tab === 'pdf' && (

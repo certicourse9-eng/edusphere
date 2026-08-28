@@ -57,10 +57,10 @@ export default function Page() {
     for (const entry of toRun) {
       setFiles(prev => prev.map(f => (f.id === entry.id ? { ...f, status: 'processing', error: null } : f)));
       try {
-        const { result, ocrText } = await gradeFile(entry.file, runCourseworkType, runSubject, runLevel, () => {
+        const { result, ocrText, ocrPages } = await gradeFile(entry.file, runCourseworkType, runSubject, runLevel, () => {
           setFiles(prev => prev.map(f => (f.id === entry.id ? { ...f, status: 'ocr' } : f)));
         });
-        setFiles(prev => prev.map(f => (f.id === entry.id ? { ...f, status: 'done', result, ocrText } : f)));
+        setFiles(prev => prev.map(f => (f.id === entry.id ? { ...f, status: 'done', result, ocrText, ocrPages } : f)));
       } catch (err) {
         setFiles(prev =>
           prev.map(f => (f.id === entry.id ? { ...f, status: 'error', error: (err as Error).message } : f))

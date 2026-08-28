@@ -1,4 +1,4 @@
-import type { CourseworkType, GradingResult, Level } from './types';
+import type { CourseworkType, GradingResult, Level, OcrPage } from './types';
 
 export function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -17,7 +17,12 @@ async function readJson(resp: Response): Promise<unknown> {
   }
 }
 
-export async function ocrFile(pdfBase64: string): Promise<string> {
+export interface OcrFileOutcome {
+  text: string;
+  pages: OcrPage[];
+}
+
+export async function ocrFile(pdfBase64: string): Promise<OcrFileOutcome> {
   let resp: Response;
   try {
     resp = await fetch('/api/ocr', {
@@ -34,13 +39,22 @@ export async function ocrFile(pdfBase64: string): Promise<string> {
     const message = (data as { error?: string } | null)?.error;
     throw new Error(message || `OCR failed (status ${resp.status})`);
   }
-  const text = (data as { text?: string } | null)?.text;
-  if (!text) throw new Error('OCR response did not include extracted text');
-  return text;
+  const parsed = data as { text?: string; pages?: OcrPage[] } | null;
+  if (!parsed?.text) throw new Error('OCR response did not include extracted text');
+  return { text: parsed.text, pages: parsed.pages ?? [] };
+}
+
+/** Prefixes every OCR'd line with a global [L#] marker so the grading model
+ *  can reference exactly which line(s) an annotation applies to, without
+ *  needing fuzzy text matching to re-locate it afterwards. */
+export function buildLineMarkedText(pages: OcrPage[]): string {
+  let index = 0;
+  const pageBlocks = pages.map(page => page.lines.map(line => `[L${index++}] ${line.text}`).join('\n'));
+  return pageBlocks.join('\n\n---\n\n');
 }
 
 export async function gradeText(
-  ocrText: string,
+  markedText: string,
   courseworkType: CourseworkType,
   subject: string,
   level: Level
@@ -50,7 +64,7 @@ export async function gradeText(
     resp = await fetch('/api/grade', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ocrText, courseworkType, subject, level })
+      body: JSON.stringify({ ocrText: markedText, courseworkType, subject, level })
     });
   } catch (err) {
     throw new Error(`Could not reach the grading server: ${(err as Error).message}`);
@@ -67,6 +81,7 @@ export async function gradeText(
 export interface GradeFileOutcome {
   result: GradingResult;
   ocrText: string;
+  ocrPages: OcrPage[];
 }
 
 export async function gradeFile(
@@ -78,7 +93,8 @@ export async function gradeFile(
 ): Promise<GradeFileOutcome> {
   const pdfBase64 = await fileToBase64(file);
   onOcrStart?.();
-  const ocrText = await ocrFile(pdfBase64);
-  const result = await gradeText(ocrText, courseworkType, subject, level);
-  return { result, ocrText };
+  const { text, pages } = await ocrFile(pdfBase64);
+  const markedText = buildLineMarkedText(pages);
+  const result = await gradeText(markedText, courseworkType, subject, level);
+  return { result, ocrText: text, ocrPages: pages };
 }

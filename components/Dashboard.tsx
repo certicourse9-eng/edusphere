@@ -15,11 +15,17 @@ interface DashboardProps {
 
 export default function Dashboard({ files, onTeacherFeedbackChange, onExport, exportDisabled }: DashboardProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
   const graded = files.filter(
     (f): f is StudentFile & { result: NonNullable<StudentFile['result']> } => f.status === 'done' && f.result !== null
   );
 
   if (graded.length === 0) return null;
+
+  const query = search.trim().toLowerCase();
+  const visible = query
+    ? graded.filter(f => f.studentId.toLowerCase().includes(query) || f.fileName.toLowerCase().includes(query))
+    : graded;
 
   const errorCount = files.filter(f => f.status === 'error').length;
   const questionsAssessed = graded.reduce((sum, f) => sum + f.result.questions.length, 0);
@@ -40,6 +46,20 @@ export default function Dashboard({ files, onTeacherFeedbackChange, onExport, ex
         <Stat label="Errors" value={String(errorCount)} warn={errorCount > 0} />
       </div>
 
+      <input
+        type="text"
+        className={styles.searchBox}
+        placeholder="Search by student ID or filename…"
+        value={search}
+        onChange={e => setSearch(e.target.value)}
+        aria-label="Search students"
+      />
+      {query && (
+        <p className={styles.searchHint}>
+          {visible.length} of {graded.length} student{graded.length === 1 ? '' : 's'} match
+        </p>
+      )}
+
       <div className={styles.tableWrap}>
         <table className={styles.table}>
           <thead>
@@ -53,7 +73,14 @@ export default function Dashboard({ files, onTeacherFeedbackChange, onExport, ex
             </tr>
           </thead>
           <tbody>
-            {graded.map(f => {
+            {visible.length === 0 && (
+              <tr>
+                <td colSpan={6} className={styles.noResults}>
+                  No students match &quot;{search}&quot;.
+                </td>
+              </tr>
+            )}
+            {visible.map(f => {
               const r = f.result;
               const band = getBand(r.totalScore, r.maxTotal);
               const grade = approxIbGrade(r.totalScore, r.maxTotal);

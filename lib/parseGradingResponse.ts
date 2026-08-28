@@ -1,4 +1,24 @@
-import type { CriterionScore, GradedQuestion, GradingResult } from './types';
+import type { Annotation, AnnotationType, CriterionScore, GradedQuestion, GradingResult } from './types';
+
+const ANNOTATION_TYPES: AnnotationType[] = ['strength', 'weakness', 'suggestion', 'criterion'];
+
+function normalizeAnnotations(raw: unknown): Annotation[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((a): a is Record<string, unknown> => !!a && typeof a === 'object')
+    .map(a => {
+      const type = ANNOTATION_TYPES.includes(a.type as AnnotationType) ? (a.type as AnnotationType) : 'suggestion';
+      const annotation: Annotation = {
+        type,
+        lineStart: typeof a.lineStart === 'number' ? a.lineStart : 0,
+        lineEnd: typeof a.lineEnd === 'number' ? a.lineEnd : 0,
+        comment: typeof a.comment === 'string' ? a.comment : ''
+      };
+      if (typeof a.criterionCode === 'string' && a.criterionCode) annotation.criterionCode = a.criterionCode;
+      return annotation;
+    })
+    .filter(a => a.comment.length > 0);
+}
 
 function normalizeCriteria(raw: unknown): CriterionScore[] {
   if (!Array.isArray(raw)) return [];
@@ -63,7 +83,8 @@ export function parseGradingResponse(rawText: string, detectedSubject: string): 
     generalFeedback: p.generalFeedback,
     totalScore: typeof p.totalScore === 'number' ? p.totalScore : 0,
     maxTotal: typeof p.maxTotal === 'number' ? p.maxTotal : 0,
-    detectedSubject
+    detectedSubject,
+    annotations: normalizeAnnotations(p.annotations)
   };
   if (typeof p.error === 'string') result.error = p.error;
   return result;

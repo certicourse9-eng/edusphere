@@ -29,6 +29,23 @@ export interface GradedQuestion {
   criteria: CriterionScore[];
 }
 
+export type AnnotationType = 'strength' | 'weakness' | 'suggestion' | 'criterion';
+
+export const ANNOTATION_TYPE_LABELS: Record<AnnotationType, string> = {
+  strength: 'Strength',
+  weakness: 'Weakness',
+  suggestion: 'Suggestion',
+  criterion: 'Criterion'
+};
+
+export interface Annotation {
+  type: AnnotationType;
+  criterionCode?: string;
+  lineStart: number;
+  lineEnd: number;
+  comment: string;
+}
+
 export interface GradingResult {
   questions: GradedQuestion[];
   generalFeedback: string[];
@@ -36,6 +53,19 @@ export interface GradingResult {
   maxTotal: number;
   error?: string;
   detectedSubject: string;
+  annotations: Annotation[];
+}
+
+/** One OCR'd text line and its pixel bounding box [x1, y1, x2, y2] on its page's image. */
+export interface OcrLine {
+  text: string;
+  box: [number, number, number, number];
+}
+
+/** One page of the scanned PDF, rendered by PaddleOCR as a data URL, with its detected lines. */
+export interface OcrPage {
+  imageDataUrl: string;
+  lines: OcrLine[];
 }
 
 export interface StudentFile {
@@ -48,4 +78,5 @@ export interface StudentFile {
   error: string | null;
   teacherFeedback: string;
   ocrText?: string;
+  ocrPages?: OcrPage[];
 }

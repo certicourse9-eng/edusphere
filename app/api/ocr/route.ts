@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import type { OcrLine, OcrPage } from '@/lib/types';
 
 const JOB_URL = 'https://paddleocr.aistudio-app.com/api/v2/ocr/jobs';
 const MODEL = 'PP-OCRv6';
@@ -28,17 +29,44 @@ function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-/** PaddleX's per-page OCR result nests recognized text under prunedResult.rec_texts.
- *  This is inferred from PaddleX's standard OCR pipeline output shape, not confirmed
- *  against a live response (the reference script we have only exercises image
- *  download) - verify on first real run and adjust here if the field differs. */
-function extractPageText(ocrResult: unknown): string | null {
+/** PaddleX's per-page OCR result nests recognized lines under prunedResult:
+ *  rec_texts[i] is the text of line i, rec_boxes[i] is its [x1,y1,x2,y2] pixel
+ *  box on the page image at inputImage - confirmed against a live response
+ *  (submitted a real PDF and inspected the raw JSON), not just inferred. */
+function extractPageLines(ocrResult: unknown): { lines: OcrLine[]; imageUrl: string | null } | null {
   if (!ocrResult || typeof ocrResult !== 'object') return null;
-  const pruned = (ocrResult as Record<string, unknown>).prunedResult;
+  const record = ocrResult as Record<string, unknown>;
+  const pruned = record.prunedResult;
   if (!pruned || typeof pruned !== 'object') return null;
-  const recTexts = (pruned as Record<string, unknown>).rec_texts;
-  if (!Array.isArray(recTexts) || recTexts.length === 0) return null;
-  return recTexts.filter((t): t is string => typeof t === 'string' && t.length > 0).join('\n');
+  const prunedRecord = pruned as Record<string, unknown>;
+  const recTexts = prunedRecord.rec_texts;
+  const recBoxes = prunedRecord.rec_boxes;
+  if (!Array.isArray(recTexts) || !Array.isArray(recBoxes)) return null;
+
+  const lines: OcrLine[] = [];
+  for (let i = 0; i < recTexts.length; i++) {
+    const text = recTexts[i];
+    const box = recBoxes[i];
+    if (typeof text !== 'string' || !text.length) continue;
+    if (!Array.isArray(box) || box.length !== 4 || box.some(n => typeof n !== 'number')) continue;
+    lines.push({ text, box: box as [number, number, number, number] });
+  }
+  if (lines.length === 0) return null;
+
+  const imageUrl = typeof record.inputImage === 'string' ? record.inputImage : null;
+  return { lines, imageUrl };
+}
+
+async function fetchAsDataUrl(url: string): Promise<string | null> {
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) return null;
+    const contentType = resp.headers.get('content-type') || 'image/jpeg';
+    const buffer = Buffer.from(await resp.arrayBuffer());
+    return `data:${contentType};base64,${buffer.toString('base64')}`;
+  } catch {
+    return null;
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -157,7 +185,7 @@ export async function POST(req: NextRequest) {
   }
 
   const jsonlText = await jsonlResp.text();
-  const pageTexts: string[] = [];
+  const pageResults: { lines: OcrLine[]; imageUrl: string | null }[] = [];
 
   for (const line of jsonlText.split('\n')) {
     const trimmed = line.trim();
@@ -171,18 +199,30 @@ export async function POST(req: NextRequest) {
     const ocrResults = (parsed as { result?: { ocrResults?: unknown[] } })?.result?.ocrResults;
     if (!Array.isArray(ocrResults)) continue;
     for (const res of ocrResults) {
-      const pageText = extractPageText(res);
-      if (pageText) pageTexts.push(pageText);
+      const pageData = extractPageLines(res);
+      if (pageData) pageResults.push(pageData);
     }
   }
 
-  const text = pageTexts.join('\n\n---\n\n');
-  if (!text) {
+  if (pageResults.length === 0) {
     return NextResponse.json(
-      { error: 'PaddleOCR job completed but no recognized text (rec_texts) was found in the result — the response shape may differ from what app/api/ocr/route.ts expects.' },
+      { error: 'PaddleOCR job completed but no recognized text (rec_texts/rec_boxes) was found in the result — the response shape may differ from what app/api/ocr/route.ts expects.' },
       { status: 502 }
     );
   }
 
-  return NextResponse.json({ text }, { status: 200 });
+  // Download each page's rendered image so it can be displayed later without
+  // depending on PaddleOCR's signed URL, which may expire.
+  const pages: OcrPage[] = [];
+  for (const { lines, imageUrl } of pageResults) {
+    const imageDataUrl = imageUrl ? await fetchAsDataUrl(imageUrl) : null;
+    pages.push({ imageDataUrl: imageDataUrl ?? '', lines });
+  }
+
+  const text = pages.map(p => p.lines.map(l => l.text).join('\n')).join('\n\n---\n\n');
+  if (!text) {
+    return NextResponse.json({ error: 'PaddleOCR extracted pages but no line text was present' }, { status: 502 });
+  }
+
+  return NextResponse.json({ text, pages }, { status: 200 });
 }
