@@ -1,4 +1,32 @@
-import type { GradingResult } from './types';
+import type { CriterionScore, GradedQuestion, GradingResult } from './types';
+
+function normalizeCriteria(raw: unknown): CriterionScore[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((c): c is Record<string, unknown> => !!c && typeof c === 'object')
+    .map(c => ({
+      code: typeof c.code === 'string' ? c.code : '',
+      name: typeof c.name === 'string' ? c.name : '',
+      score: typeof c.score === 'number' ? c.score : 0,
+      maxScore: typeof c.maxScore === 'number' ? c.maxScore : 0,
+      comment: typeof c.comment === 'string' ? c.comment : ''
+    }));
+}
+
+function normalizeQuestions(raw: unknown): GradedQuestion[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((q): q is Record<string, unknown> => !!q && typeof q === 'object')
+    .map(q => ({
+      number: typeof q.number === 'number' ? q.number : 0,
+      questionText: typeof q.questionText === 'string' ? q.questionText : '',
+      answerText: typeof q.answerText === 'string' ? q.answerText : '',
+      score: typeof q.score === 'number' ? q.score : 0,
+      maxScore: typeof q.maxScore === 'number' ? q.maxScore : 0,
+      feedback: typeof q.feedback === 'string' ? q.feedback : '',
+      criteria: normalizeCriteria(q.criteria)
+    }));
+}
 
 export function parseGradingResponse(rawText: string, detectedSubject: string): GradingResult {
   let cleaned = rawText.trim();
@@ -31,7 +59,7 @@ export function parseGradingResponse(rawText: string, detectedSubject: string): 
 
   const p = parsed as GradingResult;
   const result: GradingResult = {
-    questions: p.questions,
+    questions: normalizeQuestions(p.questions),
     generalFeedback: p.generalFeedback,
     totalScore: typeof p.totalScore === 'number' ? p.totalScore : 0,
     maxTotal: typeof p.maxTotal === 'number' ? p.maxTotal : 0,

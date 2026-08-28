@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import styles from './StudentReportRow.module.css';
 import ScoreRing from './ScoreRing';
 import SubjectIcon from './SubjectIcon';
@@ -14,7 +14,15 @@ interface StudentReportRowProps {
 }
 
 export default function StudentReportRow({ file, onTeacherFeedbackChange }: StudentReportRowProps) {
-  const [tab, setTab] = useState<'overview' | 'questions' | 'ocr'>('overview');
+  const [tab, setTab] = useState<'overview' | 'questions' | 'pdf' | 'ocr'>('overview');
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    const url = URL.createObjectURL(file.file);
+    setPdfUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file.file]);
+
   const r = file.result;
   if (!r) return null;
 
@@ -30,6 +38,9 @@ export default function StudentReportRow({ file, onTeacherFeedbackChange }: Stud
         </button>
         <button className={tab === 'questions' ? styles.activeTab : ''} onClick={() => setTab('questions')}>
           Questions
+        </button>
+        <button className={tab === 'pdf' ? styles.activeTab : ''} onClick={() => setTab('pdf')}>
+          Original PDF
         </button>
         {file.ocrText && (
           <button className={tab === 'ocr' ? styles.activeTab : ''} onClick={() => setTab('ocr')}>
@@ -97,15 +108,42 @@ export default function StudentReportRow({ file, onTeacherFeedbackChange }: Stud
                     {q.score}/{q.maxScore}
                   </span>
                 </p>
+                {q.criteria.length > 0 && (
+                  <div className={styles.criteriaList}>
+                    {q.criteria.map(c => (
+                      <div key={c.code} className={styles.criterionRow}>
+                        <div className={styles.criterionHead}>
+                          <span className={styles.criterionName}>
+                            {c.code}: {c.name}
+                          </span>
+                          <span className={styles.criterionScore}>
+                            {c.score}/{c.maxScore}
+                          </span>
+                        </div>
+                        {c.comment && <p className={styles.criterionComment}>{c.comment}</p>}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
       )}
 
+      {tab === 'pdf' && (
+        <div className={styles.pdfPane}>
+          {pdfUrl ? (
+            <iframe src={pdfUrl} title={`${file.fileName} - original scanned sheet`} className={styles.pdfFrame} />
+          ) : (
+            <p className={styles.ocrHint}>Loading PDF…</p>
+          )}
+        </div>
+      )}
+
       {tab === 'ocr' && file.ocrText && (
         <div className={styles.ocrPane}>
-          <p className={styles.ocrHint}>Raw text extracted by PaddleOCR, before it was sent to Claude for grading.</p>
+          <p className={styles.ocrHint}>Raw text extracted by PaddleOCR, before it was sent to Groq for grading.</p>
           <pre className={styles.ocrText}>{file.ocrText}</pre>
         </div>
       )}

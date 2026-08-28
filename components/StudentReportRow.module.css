@@ -189,6 +189,55 @@
   white-space: nowrap;
 }
 
+.criteriaList {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.criterionRow {
+  font-size: 12px;
+}
+
+.criterionHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.criterionName {
+  color: var(--text);
+}
+
+.criterionScore {
+  font-family: var(--font-mono), monospace;
+  color: var(--text-soft);
+  white-space: nowrap;
+}
+
+.criterionComment {
+  margin: 2px 0 0;
+  color: var(--text-soft);
+}
+
+.pdfPane {
+  display: flex;
+  flex-direction: column;
+}
+
+.pdfFrame {
+  width: 100%;
+  height: 70vh;
+  min-height: 480px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+}
+
 .ocrPane {
   display: flex;
   flex-direction: column;
