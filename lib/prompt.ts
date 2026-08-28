@@ -79,7 +79,8 @@ ${ocrText}
 """`;
   }
 
-  const courseworkLabel = courseworkType === 'internal-assessment' ? 'Internal Assessment' : 'external assessment';
+  const courseworkLabel =
+    courseworkType === 'internal-assessment' ? 'Internal Assessment' : courseworkType === 'exam' ? 'exam' : 'external assessment';
 
   return `You are an IB examiner's grading assistant reviewing a scanned student ${courseworkLabel} answer sheet for ${subject} ${level}.
 

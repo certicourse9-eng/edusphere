@@ -7,7 +7,7 @@ import type { CourseworkType, GradingResult } from '@/lib/types';
 const GENERAL_SUBJECT = 'General / Other';
 const TOK_SUBJECT_LABEL = 'Theory of Knowledge';
 const DETECTABLE_SUBJECTS = SUBJECTS.filter(s => s !== GENERAL_SUBJECT);
-const COURSEWORK_TYPES: CourseworkType[] = ['internal-assessment', 'extended-essay', 'tok', 'external-assessment'];
+const COURSEWORK_TYPES: CourseworkType[] = ['internal-assessment', 'extended-essay', 'tok', 'external-assessment', 'exam'];
 
 interface GradeRequestBody {
   ocrText?: string;

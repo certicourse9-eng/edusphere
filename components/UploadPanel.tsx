@@ -7,7 +7,7 @@ import { SUBJECTS } from '@/lib/subjectIcons';
 import type { CourseworkType, IBProgramme, Level } from '@/lib/types';
 import { COURSEWORK_TYPE_LABELS, IB_PROGRAMME_LABELS } from '@/lib/types';
 
-const COURSEWORK_TYPES: CourseworkType[] = ['internal-assessment', 'extended-essay', 'tok', 'external-assessment'];
+const COURSEWORK_TYPES: CourseworkType[] = ['internal-assessment', 'extended-essay', 'tok', 'external-assessment', 'exam'];
 const IB_PROGRAMMES: IBProgramme[] = ['DP', 'MYP'];
 
 interface UploadPanelProps {
@@ -50,7 +50,7 @@ export default function UploadPanel({
   progressLabel
 }: UploadPanelProps) {
   const showSubject = courseworkType !== 'tok';
-  const showLevel = courseworkType === 'internal-assessment' || courseworkType === 'external-assessment';
+  const showLevel = courseworkType === 'internal-assessment' || courseworkType === 'external-assessment' || courseworkType === 'exam';
   const [dragActive, setDragActive] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -131,7 +131,7 @@ export default function UploadPanel({
       )}
 
       <div className={styles.field}>
-        <label>Coursework type</label>
+        <label>Coursework / Assessment Type</label>
         <div className={styles.courseworkGrid}>
           {COURSEWORK_TYPES.map(t => (
             <button

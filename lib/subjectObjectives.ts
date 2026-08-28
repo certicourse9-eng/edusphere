@@ -197,5 +197,7 @@ export function getCriteria(courseworkType: CourseworkType, subject: string): Su
   if (courseworkType === 'extended-essay') return EXTENDED_ESSAY_CRITERIA;
   if (courseworkType === 'tok') return TOK_CRITERIA;
   if (courseworkType === 'internal-assessment') return INTERNAL_CRITERIA[subject] ?? generalInternal;
+  // 'external-assessment' and 'exam' are graded the same way — externally-set,
+  // subject-specific assessment objective criteria.
   return EXTERNAL_CRITERIA[subject] ?? generalExternal;
 }
