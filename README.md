@@ -1,25 +1,32 @@
 # EduSphere (Next.js)
 
-A teacher-facing tool that bulk-uploads scanned IB answer-sheet PDFs and
-grades them: the teacher picks a **subject** before uploading, **PaddleOCR**
-reads each PDF, then **Groq** (running OpenAI's open-weight GPT-OSS 120B)
-verifies the sheet's actual content matches that subject before reasoning
-over it against that subject's own IB-style marking criteria to produce
-suggested marks and feedback. If the content clearly belongs to a
-*different* subject than the one picked, the sheet is flagged as a
-mismatch instead of graded. Both API keys are read server-side only —
-neither ever reaches the browser. Both services have genuinely free tiers
-with no billing/card requirement.
+A teacher-facing tool that bulk-uploads scanned IB student work and grades
+it. The teacher first picks a **coursework type** — Internal Assessment,
+Extended Essay, TOK essay/exhibition, or External Assessment — and (for
+everything except TOK) a **subject**. **PaddleOCR** reads each PDF, then
+**Groq** (running OpenAI's open-weight GPT-OSS 120B) verifies the content
+matches the selected subject before grading it against criteria specific
+to that *combination* of coursework type and subject — an Internal
+Assessment and an exam answer sheet in the same subject use genuinely
+different criteria, matching how IB actually structures assessment. If the
+content clearly belongs to a different subject than the one picked, the
+sheet is flagged as a mismatch instead of graded. Both API keys are read
+server-side only — neither ever reaches the browser. Both services have
+genuinely free tiers with no billing/card requirement.
 
 ```
-Upload PDF (subject pre-selected) → Next.js API route → PaddleOCR → extracted text
-  → subject verification (Groq) → match? → per-subject IB marking criteria
-                                 → mismatch? → flagged, not graded
+Upload PDF (coursework type + subject pre-selected) → Next.js API route
+  → PaddleOCR → extracted text
+  → subject verification (Groq, skipped for TOK) → match? → criteria for
+    this coursework type + subject         → mismatch? → flagged, not graded
   → grading pass (Groq) → suggested marks + feedback → teacher review
 ```
 
-Selecting **"General / Other"** skips verification entirely and always
-grades with general criteria — there's nothing to mismatch against.
+Selecting **"General / Other"** as the subject skips verification entirely
+and always grades with general criteria — there's nothing to mismatch
+against. **Extended Essay** and **TOK** are graded as one continuous piece
+of writing (their own fixed, subject-agnostic criteria), not split into
+question/answer pairs like an exam sheet or IA.
 
 ## Setup
 
@@ -125,9 +132,49 @@ for a different model Groq hosts if you want.
 > hasn't changed through any of these; only the fetch call and response
 > parsing in `app/api/grade/route.ts` differ per provider.
 
+## Coursework types and criteria (`lib/subjectObjectives.ts`)
+
+Four coursework types, each with its own criteria structure:
+
+- **External Assessment** — exam-style answer sheets. Per-subject-group
+  criteria (4 criteria, AO-style: e.g. Knowledge and understanding,
+  Application, Analysis and evaluation, Communication for sciences).
+- **Internal Assessment** — coursework, genuinely different criteria from
+  the exam AOs even in the same subject (e.g. sciences IA uses Personal
+  engagement / Exploration / Analysis / Evaluation / Communication instead).
+- **Extended Essay** — subject-agnostic, fixed A-E criteria (Focus and
+  method, Knowledge and understanding, Critical thinking, Presentation,
+  Engagement; 34 points total, matching the real EE point structure).
+- **TOK essay/exhibition** — subject-agnostic, fixed criteria. Real TOK
+  essays are officially marked with a single holistic impression rather
+  than separate weighted criteria; this app breaks it into named
+  components anyway purely to give more specific, actionable feedback —
+  that's a deliberate simplification for this demo, not the official
+  method.
+
+> **Accuracy note**: criterion *names* and *point totals* for External/
+> Internal Assessment and the Extended Essay follow the general shape of
+> real, published IB DP assessment objectives/criteria as a good-faith
+> approximation. The *description* text for every criterion was written
+> originally for this demo, not copied from official IB subject guides or
+> markschemes (which are copyrighted and, for IA/exam papers, specific to
+> each subject's actual published guide — something a generic tool like
+> this can't reproduce exactly). Treat every criterion here as an
+> approximation to verify against the current official subject guide, not
+> an authoritative source.
+
+`getCriteria(courseworkType, subject)` selects the right set;
+`buildTextGradingPrompt` (`lib/prompt.ts`) branches into two shapes:
+Internal/External Assessment split the OCR'd text into multiple
+question/answer pairs (existing behaviour); Extended Essay/TOK treat the
+whole OCR'd text as ONE continuous piece and grade it holistically as a
+single `GradedQuestion` entry — no schema fork needed, the existing
+questions-array UI just always has exactly one item for those two types.
+
 ## How it works
 
-1. Pick the **Subject** and **Level** for the batch you're about to upload.
+1. Pick the **coursework type**, then (for everything except TOK) the
+   **Subject** and, for Internal/External Assessment, the **Level**.
 2. Upload PDFs by dragging them onto the dropzone or clicking to browse.
 3. Each student's ID is derived from their filename (first run of digits, or
    the filename itself if there are no digits).
