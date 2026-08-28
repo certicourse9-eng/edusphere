@@ -2,16 +2,21 @@
 
 A teacher-facing tool that bulk-uploads scanned IB answer-sheet PDFs and
 grades them: **PaddleOCR** reads each PDF, then **Groq** (running OpenAI's
-open-weight GPT-OSS 120B) reasons over the extracted text against
-IB-style marking criteria to produce suggested marks and feedback. Both
-API keys are read server-side only — neither ever reaches the browser.
-Both services have genuinely free tiers with no billing/card requirement.
+open-weight GPT-OSS 120B) auto-detects which subject the content actually
+belongs to and reasons over the extracted text against that subject's own
+IB-style marking criteria to produce suggested marks and feedback. Both API
+keys are read server-side only — neither ever reaches the browser. Both
+services have genuinely free tiers with no billing/card requirement.
 
 ```
 Upload PDF → Next.js API route → PaddleOCR → extracted text
-  → question/answer split → Groq/GPT-OSS (LLM reasoning) → IB marking criteria
-  → suggested marks + feedback → teacher review
+  → subject detection (Groq) → per-subject IB marking criteria
+  → grading pass (Groq) → suggested marks + feedback → teacher review
 ```
+
+There's no manual subject picker — the subject shown on each report is
+whatever the model determined from the sheet's actual content, falling back
+to "General / Other" if it can't confidently tell.
 
 ## Setup
 
@@ -59,15 +64,30 @@ your own machine instead of the hosted API) if you'd rather avoid an
 external OCR service entirely — swap `app/api/ocr/route.ts` to call it via
 `OCR_SERVICE_URL` if so.
 
-## Groq (the grading/reasoning step)
+## Groq (subject detection + grading/reasoning)
 
-`app/api/grade/route.ts` sends the OCR'd text, wrapped in an IB-marking
-prompt (`lib/prompt.ts`), to Groq's OpenAI-compatible chat completions
-endpoint (`POST https://api.groq.com/openai/v1/chat/completions`), running
-`openai/gpt-oss-120b` by default, with `response_format: {type:
-"json_object"}` so the model is constrained to return structured JSON. The
-response is parsed by `lib/parseGradingResponse.ts`, which also tolerates
-markdown fences or stray commentary if a model adds them anyway.
+`app/api/grade/route.ts` makes **two** Groq calls per sheet:
+
+1. **Detection**: `buildSubjectDetectionPrompt` (`lib/prompt.ts`) asks the
+   model to classify the OCR'd text against the known subject list
+   (`lib/subjectIcons.ts`), or respond `General / Other` if none clearly
+   match. The raw response is normalized/validated against that list
+   server-side (`normalizeDetectedSubject`) — if the model returns anything
+   that doesn't exactly match a known subject, or the call fails outright,
+   it falls back to `General / Other` rather than breaking the whole grade.
+2. **Grading**: `buildTextGradingPrompt` is built using that detected
+   subject's assessment objectives (`lib/subjectObjectives.ts` — real,
+   distinct objectives per subject group: sciences, math, individuals &
+   societies, language & literature; not one generic rubric for everything).
+
+Both calls go to Groq's OpenAI-compatible chat completions endpoint
+(`POST https://api.groq.com/openai/v1/chat/completions`), running
+`openai/gpt-oss-120b` by default. The grading call uses `response_format:
+{type: "json_object"}` so the model is constrained to return structured
+JSON; the response is parsed by `lib/parseGradingResponse.ts`, which also
+tolerates markdown fences or stray commentary if a model adds them anyway.
+The detected subject is attached to the result (`detectedSubject`) and
+shown in the report, the mark-sheet table, and the CSV export.
 
 `GROQ_API_KEY` is read only inside this server-only route handler, so it's
 never bundled into client-side code or sent to the browser. Without it set,
@@ -98,11 +118,12 @@ for a different model Groq hosts if you want.
    the filename itself if there are no digits).
 3. Click **Grade sheets**. Files are processed **sequentially, one at a
    time**: each is OCR'd via `/api/ocr`, then the extracted text is sent to
-   `/api/grade`, which calls Groq and returns parsed JSON (or a structured
-   error) to the browser.
-4. Graded students appear in the dashboard: click a row to see an animated
-   score ring, an approximate grade, per-question breakdowns, the raw OCR
-   text, and a place to add your own feedback (auto-saved as you type).
+   `/api/grade`, which detects the subject, grades against that subject's
+   criteria, and returns parsed JSON (or a structured error) to the browser.
+4. Graded students appear in the dashboard: click a row to see the detected
+   subject, an animated score ring, an approximate grade, per-question
+   breakdowns, the raw OCR text, and a place to add your own feedback
+   (auto-saved as you type).
 5. **Export CSV** downloads one row per graded student.
 
 ## Important: demo scores, not an official IB grade
@@ -125,19 +146,22 @@ app/
   api/ocr/route.ts      Server-side PaddleOCR proxy (holds the PaddleOCR credentials)
 components/            UploadPanel, FileQueue, Dashboard, StudentReportRow,
                         ScoreRing, TeacherFeedbackBox, SubjectIcon, HeroBlobs
-lib/                    types, prompt builder, response parser, grade
-                        bands/thresholds, subject-icon map, student ID
+lib/                    types, prompt builder (detection + grading), response
+                        parser, grade bands/thresholds, subject-icon map,
+                        per-subject assessment objectives, student ID
                         derivation, CSV export, client-side grading call
 ```
 
 ## Known limitations / things worth double-checking
 
-- **Build-verified.** `npx tsc --noEmit` and `npm run build` both pass
-  clean, and a grep of the built client bundle confirms neither
-  `GROQ_API_KEY` nor `PADDLEOCR_ACCESS_TOKEN` leaks into it. PaddleOCR
-  extraction has been exercised live on the deployed Vercel URL and
-  confirmed working (the `rec_texts` field guess was correct); Groq
-  grading has not yet been exercised with a real key.
+- **Build-verified and live-tested.** `npx tsc --noEmit` and `npm run build`
+  both pass clean, and a grep of the built client bundle confirms neither
+  `GROQ_API_KEY` nor `PADDLEOCR_ACCESS_TOKEN` leaks into it. Both PaddleOCR
+  extraction and the full detect-then-grade Groq flow have been exercised
+  live against the deployed Vercel URL and confirmed working, including
+  correct subject differentiation (same answer text graded differently,
+  and correctly, when it actually belongs to different subjects) and the
+  `General / Other` fallback for unclassifiable content.
 - **The IB grade table is invented for this demo** (see above) — swap
   `IB_GRADE_THRESHOLDS` in `lib/gradeBands.ts` for real subject-specific
   boundaries if this is ever used for anything beyond a demo.
