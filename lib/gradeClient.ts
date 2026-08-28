@@ -1,4 +1,4 @@
-import type { CourseworkType, GradingResult, Level, OcrPage } from './types';
+import type { CourseworkType, FileStatus, GradingResult, Level, OcrPage } from './types';
 
 export function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -20,6 +20,7 @@ async function readJson(resp: Response): Promise<unknown> {
 export interface OcrFileOutcome {
   text: string;
   pages: OcrPage[];
+  ocrConfidence: number | null;
 }
 
 export async function ocrFile(pdfBase64: string): Promise<OcrFileOutcome> {
@@ -39,9 +40,9 @@ export async function ocrFile(pdfBase64: string): Promise<OcrFileOutcome> {
     const message = (data as { error?: string } | null)?.error;
     throw new Error(message || `OCR failed (status ${resp.status})`);
   }
-  const parsed = data as { text?: string; pages?: OcrPage[] } | null;
+  const parsed = data as { text?: string; pages?: OcrPage[]; ocrConfidence?: number | null } | null;
   if (!parsed?.text) throw new Error('OCR response did not include extracted text');
-  return { text: parsed.text, pages: parsed.pages ?? [] };
+  return { text: parsed.text, pages: parsed.pages ?? [], ocrConfidence: parsed.ocrConfidence ?? null };
 }
 
 /** Prefixes every OCR'd line with a global [L#] marker so the grading model
@@ -82,6 +83,7 @@ export interface GradeFileOutcome {
   result: GradingResult;
   ocrText: string;
   ocrPages: OcrPage[];
+  ocrConfidence: number | null;
 }
 
 export async function gradeFile(
@@ -89,12 +91,14 @@ export async function gradeFile(
   courseworkType: CourseworkType,
   subject: string,
   level: Level,
-  onOcrStart?: () => void
+  onStatusChange?: (status: FileStatus) => void
 ): Promise<GradeFileOutcome> {
   const pdfBase64 = await fileToBase64(file);
-  onOcrStart?.();
-  const { text, pages } = await ocrFile(pdfBase64);
+  onStatusChange?.('ocr-processing');
+  const { text, pages, ocrConfidence } = await ocrFile(pdfBase64);
+  onStatusChange?.('ocr-completed');
   const markedText = buildLineMarkedText(pages);
+  onStatusChange?.('evaluating');
   const result = await gradeText(markedText, courseworkType, subject, level);
-  return { result, ocrText: text, ocrPages: pages };
+  return { result, ocrText: text, ocrPages: pages, ocrConfidence };
 }

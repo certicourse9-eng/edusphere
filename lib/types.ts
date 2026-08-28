@@ -9,7 +9,38 @@ export const COURSEWORK_TYPE_LABELS: Record<CourseworkType, string> = {
   'external-assessment': 'External Assessment'
 };
 
-export type FileStatus = 'queued' | 'ocr' | 'processing' | 'done' | 'error';
+export type IBProgramme = 'DP' | 'MYP';
+
+export const IB_PROGRAMME_LABELS: Record<IBProgramme, string> = {
+  DP: 'Diploma Programme (DP)',
+  MYP: 'Middle Years Programme (MYP)'
+};
+
+export type FileStatus =
+  | 'uploaded'
+  | 'ocr-processing'
+  | 'ocr-completed'
+  | 'evaluating'
+  | 'evaluated'
+  | 'needs-review'
+  | 'teacher-approved'
+  | 'failed';
+
+export const FILE_STATUS_LABELS: Record<FileStatus, string> = {
+  uploaded: 'Uploaded',
+  'ocr-processing': 'OCR Processing',
+  'ocr-completed': 'OCR Completed',
+  evaluating: 'AI Evaluation Processing',
+  evaluated: 'Evaluated',
+  'needs-review': 'Needs Teacher Review',
+  'teacher-approved': 'Teacher Approved',
+  failed: 'Failed'
+};
+
+/** Statuses that count as "still in the queue, not yet finished one way or another". */
+export const PENDING_STATUSES: FileStatus[] = ['uploaded'];
+export const PROCESSING_STATUSES: FileStatus[] = ['ocr-processing', 'ocr-completed', 'evaluating'];
+export const FINISHED_STATUSES: FileStatus[] = ['evaluated', 'needs-review', 'teacher-approved', 'failed'];
 
 export interface CriterionScore {
   code: string;
@@ -79,4 +110,8 @@ export interface StudentFile {
   teacherFeedback: string;
   ocrText?: string;
   ocrPages?: OcrPage[];
+  /** 0-1 average PaddleOCR recognition confidence across every line on the sheet. */
+  ocrConfidence?: number;
+  /** Set when status is 'needs-review' or 'failed', explaining why. */
+  reviewReason?: string;
 }

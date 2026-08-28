@@ -33,7 +33,9 @@ function sleep(ms: number) {
  *  rec_texts[i] is the text of line i, rec_boxes[i] is its [x1,y1,x2,y2] pixel
  *  box on the page image at inputImage - confirmed against a live response
  *  (submitted a real PDF and inspected the raw JSON), not just inferred. */
-function extractPageLines(ocrResult: unknown): { lines: OcrLine[]; imageUrl: string | null } | null {
+function extractPageLines(
+  ocrResult: unknown
+): { lines: OcrLine[]; imageUrl: string | null; scores: number[] } | null {
   if (!ocrResult || typeof ocrResult !== 'object') return null;
   const record = ocrResult as Record<string, unknown>;
   const pruned = record.prunedResult;
@@ -41,20 +43,24 @@ function extractPageLines(ocrResult: unknown): { lines: OcrLine[]; imageUrl: str
   const prunedRecord = pruned as Record<string, unknown>;
   const recTexts = prunedRecord.rec_texts;
   const recBoxes = prunedRecord.rec_boxes;
+  const recScores = prunedRecord.rec_scores;
   if (!Array.isArray(recTexts) || !Array.isArray(recBoxes)) return null;
 
   const lines: OcrLine[] = [];
+  const scores: number[] = [];
   for (let i = 0; i < recTexts.length; i++) {
     const text = recTexts[i];
     const box = recBoxes[i];
     if (typeof text !== 'string' || !text.length) continue;
     if (!Array.isArray(box) || box.length !== 4 || box.some(n => typeof n !== 'number')) continue;
     lines.push({ text, box: box as [number, number, number, number] });
+    const score = Array.isArray(recScores) ? recScores[i] : undefined;
+    if (typeof score === 'number') scores.push(score);
   }
   if (lines.length === 0) return null;
 
   const imageUrl = typeof record.inputImage === 'string' ? record.inputImage : null;
-  return { lines, imageUrl };
+  return { lines, imageUrl, scores };
 }
 
 async function fetchAsDataUrl(url: string): Promise<string | null> {
@@ -185,7 +191,7 @@ export async function POST(req: NextRequest) {
   }
 
   const jsonlText = await jsonlResp.text();
-  const pageResults: { lines: OcrLine[]; imageUrl: string | null }[] = [];
+  const pageResults: { lines: OcrLine[]; imageUrl: string | null; scores: number[] }[] = [];
 
   for (const line of jsonlText.split('\n')) {
     const trimmed = line.trim();
@@ -214,15 +220,18 @@ export async function POST(req: NextRequest) {
   // Download each page's rendered image so it can be displayed later without
   // depending on PaddleOCR's signed URL, which may expire.
   const pages: OcrPage[] = [];
-  for (const { lines, imageUrl } of pageResults) {
+  const allScores: number[] = [];
+  for (const { lines, imageUrl, scores } of pageResults) {
     const imageDataUrl = imageUrl ? await fetchAsDataUrl(imageUrl) : null;
     pages.push({ imageDataUrl: imageDataUrl ?? '', lines });
+    allScores.push(...scores);
   }
+  const ocrConfidence = allScores.length > 0 ? allScores.reduce((a, b) => a + b, 0) / allScores.length : null;
 
   const text = pages.map(p => p.lines.map(l => l.text).join('\n')).join('\n\n---\n\n');
   if (!text) {
     return NextResponse.json({ error: 'PaddleOCR extracted pages but no line text was present' }, { status: 502 });
   }
 
-  return NextResponse.json({ text, pages }, { status: 200 });
+  return NextResponse.json({ text, pages, ocrConfidence }, { status: 200 });
 }

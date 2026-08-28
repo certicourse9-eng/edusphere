@@ -87,6 +87,10 @@ export default function StudentReportRow({ file, onTeacherFeedbackChange }: Stud
               </ul>
             )}
             {r.error && <p className={styles.errorNote}>{r.error}</p>}
+            {!r.error && file.reviewReason && <p className={styles.reviewNote}>⚠ {file.reviewReason}</p>}
+            {typeof file.ocrConfidence === 'number' && (
+              <p className={styles.confidenceNote}>OCR confidence: {Math.round(file.ocrConfidence * 100)}%</p>
+            )}
             <TeacherFeedbackBox initialValue={file.teacherFeedback} onSave={onTeacherFeedbackChange} />
           </div>
         </div>

@@ -50,14 +50,30 @@
   margin-top: 2px;
 }
 
+.controlsRow {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
 .searchBox {
-  width: 100%;
+  flex: 1 1 240px;
   padding: 9px 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
   font-size: 13.5px;
   color: var(--text);
-  margin-bottom: 8px;
+}
+
+.filterSelect {
+  flex: 0 1 200px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 13.5px;
+  color: var(--text);
+  background: #fff;
 }
 
 .searchBox:focus {
@@ -112,6 +128,14 @@
 
 .row:hover {
   background: var(--bg);
+}
+
+.rowDisabled {
+  cursor: default;
+}
+
+.rowDisabled:hover {
+  background: none;
 }
 
 .row td {
@@ -174,6 +198,73 @@
 .weak {
   background: rgba(255, 107, 107, 0.14);
   color: var(--coral);
+}
+
+.statusPill {
+  display: inline-block;
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+.uploaded {
+  background: #eef1f8;
+  color: var(--text-soft);
+}
+
+.ocr-processing,
+.ocr-completed {
+  background: rgba(217, 119, 6, 0.12);
+  color: #d97706;
+}
+
+.evaluating {
+  background: rgba(76, 141, 255, 0.12);
+  color: var(--primary);
+}
+
+.evaluated,
+.teacher-approved {
+  background: rgba(47, 191, 113, 0.12);
+  color: var(--green);
+}
+
+.needs-review {
+  background: rgba(245, 166, 35, 0.14);
+  color: var(--amber);
+}
+
+.failed {
+  background: rgba(255, 107, 107, 0.12);
+  color: var(--coral);
+}
+
+.approveBtn {
+  padding: 5px 12px;
+  border: 1px solid var(--primary);
+  background: #fff;
+  color: var(--primary);
+  border-radius: 20px;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font-sora), sans-serif;
+  white-space: nowrap;
+}
+
+.approveBtn:hover {
+  background: var(--primary);
+  color: #fff;
+}
+
+.approvedTag {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--green);
+  white-space: nowrap;
 }
 
 .detailRow td {

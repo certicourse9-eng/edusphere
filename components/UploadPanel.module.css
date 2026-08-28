@@ -28,7 +28,9 @@
   color: var(--text-soft);
 }
 
-.field select {
+.field select,
+.field input[type='text'],
+.field input[type='number'] {
   padding: 9px 11px;
   border: 1px solid var(--line);
   border-radius: 8px;

@@ -4,18 +4,25 @@ import { useCallback, useRef, useState } from 'react';
 import styles from './UploadPanel.module.css';
 import SubjectIcon from './SubjectIcon';
 import { SUBJECTS } from '@/lib/subjectIcons';
-import type { CourseworkType, Level } from '@/lib/types';
-import { COURSEWORK_TYPE_LABELS } from '@/lib/types';
+import type { CourseworkType, IBProgramme, Level } from '@/lib/types';
+import { COURSEWORK_TYPE_LABELS, IB_PROGRAMME_LABELS } from '@/lib/types';
 
 const COURSEWORK_TYPES: CourseworkType[] = ['internal-assessment', 'extended-essay', 'tok', 'external-assessment'];
+const IB_PROGRAMMES: IBProgramme[] = ['DP', 'MYP'];
 
 interface UploadPanelProps {
+  programme: IBProgramme;
+  onProgrammeChange: (p: IBProgramme) => void;
+  gradeYear: string;
+  onGradeYearChange: (v: string) => void;
   courseworkType: CourseworkType;
   onCourseworkTypeChange: (t: CourseworkType) => void;
   subject: string;
   onSubjectChange: (s: string) => void;
   level: Level;
   onLevelChange: (l: Level) => void;
+  expectedStudentCount: string;
+  onExpectedStudentCountChange: (v: string) => void;
   onFilesAdded: (files: File[]) => void;
   onRun: () => void;
   running: boolean;
@@ -24,12 +31,18 @@ interface UploadPanelProps {
 }
 
 export default function UploadPanel({
+  programme,
+  onProgrammeChange,
+  gradeYear,
+  onGradeYearChange,
   courseworkType,
   onCourseworkTypeChange,
   subject,
   onSubjectChange,
   level,
   onLevelChange,
+  expectedStudentCount,
+  onExpectedStudentCountChange,
   onFilesAdded,
   onRun,
   running,
@@ -76,6 +89,47 @@ export default function UploadPanel({
 
   return (
     <section className={`${styles.panel} fade-in`}>
+      <div className={styles.controls}>
+        <div className={styles.field}>
+          <label htmlFor="programme">IB Programme</label>
+          <select id="programme" value={programme} onChange={e => onProgrammeChange(e.target.value as IBProgramme)}>
+            {IB_PROGRAMMES.map(p => (
+              <option key={p} value={p}>
+                {IB_PROGRAMME_LABELS[p]}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className={styles.field}>
+          <label htmlFor="gradeYear">Grade / Year</label>
+          <input
+            id="gradeYear"
+            type="text"
+            placeholder="e.g. Year 11 / DP2"
+            value={gradeYear}
+            onChange={e => onGradeYearChange(e.target.value)}
+          />
+        </div>
+
+        <div className={styles.field}>
+          <label htmlFor="expectedCount">Number of students</label>
+          <input
+            id="expectedCount"
+            type="number"
+            min={0}
+            placeholder="e.g. 50"
+            value={expectedStudentCount}
+            onChange={e => onExpectedStudentCountChange(e.target.value)}
+          />
+        </div>
+      </div>
+      {programme === 'MYP' && (
+        <p className={styles.autoSubjectNote}>
+          MYP-specific criteria aren&apos;t built yet — sheets are graded with the DP-style criteria below as an approximation until MYP criteria are added.
+        </p>
+      )}
+
       <div className={styles.field}>
         <label>Coursework type</label>
         <div className={styles.courseworkGrid}>

@@ -1,0 +1,114 @@
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--primary);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px 24px;
+}
+
+.headRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.headRow h2 {
+  font-size: 16px;
+}
+
+.completeBadge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 20px;
+  background: var(--bg);
+  color: var(--text-soft);
+  white-space: nowrap;
+}
+
+.completeBadgeDone {
+  background: rgba(47, 191, 113, 0.14);
+  color: var(--green);
+}
+
+.progressLine {
+  margin-bottom: 18px;
+}
+
+.progressText {
+  display: block;
+  font-family: var(--font-mono), monospace;
+  font-size: 13px;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.progressTrack {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--primary), var(--teal));
+  transition: width 500ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 12px;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 6px;
+}
+
+.statValue {
+  font-family: var(--font-mono), monospace;
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.statValue.good {
+  color: var(--green);
+}
+
+.statValue.warn {
+  color: var(--amber);
+}
+
+.statValue.bad {
+  color: var(--coral);
+}
+
+.statValue.active {
+  color: var(--primary);
+}
+
+.statLabel {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-soft);
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .statsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
