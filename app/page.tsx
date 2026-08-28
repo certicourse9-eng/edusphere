@@ -1,14 +1,16 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import UploadPanel from '@/components/UploadPanel';
 import FileQueue from '@/components/FileQueue';
 import ClassProgressBar from '@/components/ClassProgressBar';
 import Dashboard from '@/components/Dashboard';
 import HeroBlobs from '@/components/HeroBlobs';
+import ChatWidget from '@/components/ChatWidget';
 import { gradeFile } from '@/lib/gradeClient';
 import { deriveStudentId } from '@/lib/studentId';
 import { buildCsv, downloadCsv } from '@/lib/csv';
+import { buildChatContext } from '@/lib/chatContext';
 import type { StudentFile, Level, CourseworkType, IBProgramme, FileStatus } from '@/lib/types';
 import { FINISHED_STATUSES } from '@/lib/types';
 
@@ -29,6 +31,7 @@ export default function Page() {
   const [expectedStudentCount, setExpectedStudentCount] = useState('');
   const [files, setFiles] = useState<StudentFile[]>([]);
   const [running, setRunning] = useState(false);
+  const [focusedFileId, setFocusedFileId] = useState<string | null>(null);
 
   const addFiles = useCallback((incoming: File[]) => {
     const pdfsOnly = incoming.filter(f => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
@@ -47,6 +50,7 @@ export default function Page() {
 
   const removeFile = useCallback((id: string) => {
     setFiles(prev => prev.filter(f => f.id !== id));
+    setFocusedFileId(prev => (prev === id ? null : prev));
   }, []);
 
   const updateTeacherFeedback = useCallback((id: string, text: string) => {
@@ -126,6 +130,20 @@ export default function Page() {
   const progressLabel = total > 0 ? `${finishedCount} / ${total} processed` : '';
   const canRun = !running && files.some(f => f.status === 'uploaded' || f.status === 'failed');
 
+  const focusedFile = files.find(f => f.id === focusedFileId) ?? null;
+  const focusedStudentLabel = focusedFile
+    ? `${focusedFile.studentId} · ${focusedFile.result?.detectedSubject ?? subject}`
+    : null;
+  const chatContext = useMemo(
+    () =>
+      buildChatContext(
+        { programme, gradeYear, courseworkType, subject, level, expectedStudentCount: expected || null },
+        files,
+        focusedFileId
+      ),
+    [programme, gradeYear, courseworkType, subject, level, expected, files, focusedFileId]
+  );
+
   return (
     <main className="page">
       <div style={{ position: 'relative' }}>
@@ -181,7 +199,11 @@ export default function Page() {
         onApprove={approveFile}
         onExport={handleExport}
         exportDisabled={finishedCount === 0}
+        focusedId={focusedFileId}
+        onFocusedIdChange={setFocusedFileId}
       />
+
+      <ChatWidget context={chatContext} focusedStudentLabel={focusedStudentLabel} />
     </main>
   );
 }

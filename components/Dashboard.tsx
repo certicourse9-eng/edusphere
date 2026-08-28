@@ -33,10 +33,19 @@ interface DashboardProps {
   onApprove: (id: string) => void;
   onExport: () => void;
   exportDisabled: boolean;
+  focusedId: string | null;
+  onFocusedIdChange: (id: string | null) => void;
 }
 
-export default function Dashboard({ files, onTeacherFeedbackChange, onApprove, onExport, exportDisabled }: DashboardProps) {
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+export default function Dashboard({
+  files,
+  onTeacherFeedbackChange,
+  onApprove,
+  onExport,
+  exportDisabled,
+  focusedId,
+  onFocusedIdChange
+}: DashboardProps) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterOption>('all');
 
@@ -118,14 +127,14 @@ export default function Dashboard({ files, onTeacherFeedbackChange, onApprove, o
             )}
             {visible.map(f => {
               const r = f.result;
-              const isOpen = expandedId === f.id;
+              const isOpen = focusedId === f.id;
               const canOpen = !!r;
               const canApprove = f.status === 'evaluated' || f.status === 'needs-review';
               return (
                 <Fragment key={f.id}>
                   <tr
                     className={`${styles.row} ${canOpen ? '' : styles.rowDisabled}`}
-                    onClick={() => canOpen && setExpandedId(isOpen ? null : f.id)}
+                    onClick={() => canOpen && onFocusedIdChange(isOpen ? null : f.id)}
                     aria-expanded={isOpen}
                   >
                     <td className={styles.caret}>{canOpen ? (isOpen ? '▾' : '▸') : ''}</td>
