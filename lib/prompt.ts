@@ -1,5 +1,18 @@
 import { getSubjectObjectives } from './subjectObjectives';
 
+export function buildSubjectDetectionPrompt(ocrText: string, knownSubjects: string[]): string {
+  return `The text below was extracted by OCR from a scanned IB student answer sheet. Based ONLY on the subject matter of the questions and answers, decide which ONE of these subjects it belongs to:
+
+${knownSubjects.map(s => `- ${s}`).join('\n')}
+
+Respond with ONLY the exact subject name from that list, copied exactly as written above - no punctuation, no explanation, nothing else. If the content clearly matches none of them, or the text is too garbled/sparse to tell, respond with exactly: General / Other
+
+OCR TEXT:
+"""
+${ocrText}
+"""`;
+}
+
 export function buildTextGradingPrompt(subject: string, level: string, ocrText: string): string {
   const objectives = getSubjectObjectives(subject);
 

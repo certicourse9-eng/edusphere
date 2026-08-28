@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import styles from './StudentReportRow.module.css';
 import ScoreRing from './ScoreRing';
+import SubjectIcon from './SubjectIcon';
 import TeacherFeedbackBox from './TeacherFeedbackBox';
 import { getBand, BAND_LABELS, BAND_COLORS, approxIbGrade } from '@/lib/gradeBands';
 import type { StudentFile } from '@/lib/types';
@@ -41,6 +42,10 @@ export default function StudentReportRow({ file, onTeacherFeedbackChange }: Stud
         <div className={styles.overview}>
           <ScoreRing score={r.totalScore} maxScore={r.maxTotal} band={band} />
           <div className={styles.overviewMeta}>
+            <p className={styles.subjectLine}>
+              <SubjectIcon subject={r.detectedSubject} />
+              Detected subject: <strong>{r.detectedSubject}</strong>
+            </p>
             <p className={styles.gradeLine}>
               Approx. IB grade: <strong>{grade}</strong> <span className={styles.approxNote}>(approx.)</span>
             </p>

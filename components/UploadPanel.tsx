@@ -2,13 +2,9 @@
 
 import { useCallback, useRef, useState } from 'react';
 import styles from './UploadPanel.module.css';
-import SubjectIcon from './SubjectIcon';
-import { SUBJECTS } from '@/lib/subjectIcons';
 import type { Level } from '@/lib/types';
 
 interface UploadPanelProps {
-  subject: string;
-  onSubjectChange: (s: string) => void;
   level: Level;
   onLevelChange: (l: Level) => void;
   onFilesAdded: (files: File[]) => void;
@@ -19,8 +15,6 @@ interface UploadPanelProps {
 }
 
 export default function UploadPanel({
-  subject,
-  onSubjectChange,
   level,
   onLevelChange,
   onFilesAdded,
@@ -69,20 +63,6 @@ export default function UploadPanel({
     <section className={`${styles.panel} fade-in`}>
       <div className={styles.controls}>
         <div className={styles.field}>
-          <label htmlFor="subject">Subject</label>
-          <div className={styles.subjectRow}>
-            <SubjectIcon subject={subject} />
-            <select id="subject" value={subject} onChange={e => onSubjectChange(e.target.value)}>
-              {SUBJECTS.map(s => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className={styles.field}>
           <label htmlFor="level">Level</label>
           <select id="level" value={level} onChange={e => onLevelChange(e.target.value as Level)}>
             <option value="SL">SL</option>
@@ -90,6 +70,9 @@ export default function UploadPanel({
           </select>
         </div>
       </div>
+      <p className={styles.autoSubjectNote}>
+        Subject is detected automatically from each sheet&apos;s content — no need to pick one.
+      </p>
 
       <div
         className={`${styles.dropzone} ${dragActive ? styles.dropzoneActive : ''}`}

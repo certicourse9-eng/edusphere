@@ -17,7 +17,6 @@ function makeId(): string {
 }
 
 export default function Page() {
-  const [subject, setSubject] = useState('Mathematics AA');
   const [level, setLevel] = useState<Level>('HL');
   const [files, setFiles] = useState<StudentFile[]>([]);
   const [running, setRunning] = useState(false);
@@ -48,14 +47,13 @@ export default function Page() {
   const runPipeline = useCallback(async () => {
     if (running) return;
     setRunning(true);
-    const runSubject = subject;
     const runLevel = level;
     const toRun = files.filter(f => f.status === 'queued' || f.status === 'error');
 
     for (const entry of toRun) {
       setFiles(prev => prev.map(f => (f.id === entry.id ? { ...f, status: 'processing', error: null } : f)));
       try {
-        const { result, ocrText } = await gradeFile(entry.file, runSubject, runLevel, () => {
+        const { result, ocrText } = await gradeFile(entry.file, runLevel, () => {
           setFiles(prev => prev.map(f => (f.id === entry.id ? { ...f, status: 'ocr' } : f)));
         });
         setFiles(prev => prev.map(f => (f.id === entry.id ? { ...f, status: 'done', result, ocrText } : f)));
@@ -67,7 +65,7 @@ export default function Page() {
     }
 
     setRunning(false);
-  }, [files, running, subject, level]);
+  }, [files, running, level]);
 
   const handleExport = useCallback(() => {
     downloadCsv(buildCsv(files), 'grading-results.csv');
@@ -95,8 +93,6 @@ export default function Page() {
       </div>
 
       <UploadPanel
-        subject={subject}
-        onSubjectChange={setSubject}
         level={level}
         onLevelChange={setLevel}
         onFilesAdded={addFiles}

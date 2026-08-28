@@ -12,6 +12,7 @@ export function buildCsv(files: StudentFile[]): string {
   const header = [
     'Student ID',
     'Filename',
+    'Detected Subject',
     'Question Count',
     'Total Score',
     'Max Score',
@@ -27,6 +28,7 @@ export function buildCsv(files: StudentFile[]): string {
       return [
         f.studentId,
         f.fileName,
+        r.detectedSubject,
         String(r.questions.length),
         String(r.totalScore),
         String(r.maxTotal),

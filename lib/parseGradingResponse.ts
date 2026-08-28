@@ -1,6 +1,6 @@
 import type { GradingResult } from './types';
 
-export function parseGradingResponse(rawText: string): GradingResult {
+export function parseGradingResponse(rawText: string, detectedSubject: string): GradingResult {
   let cleaned = rawText.trim();
 
   const fenceMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/i);
@@ -34,7 +34,8 @@ export function parseGradingResponse(rawText: string): GradingResult {
     questions: p.questions,
     generalFeedback: p.generalFeedback,
     totalScore: typeof p.totalScore === 'number' ? p.totalScore : 0,
-    maxTotal: typeof p.maxTotal === 'number' ? p.maxTotal : 0
+    maxTotal: typeof p.maxTotal === 'number' ? p.maxTotal : 0,
+    detectedSubject
   };
   if (typeof p.error === 'string') result.error = p.error;
   return result;

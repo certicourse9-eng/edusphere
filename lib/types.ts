@@ -17,6 +17,7 @@ export interface GradingResult {
   totalScore: number;
   maxTotal: number;
   error?: string;
+  detectedSubject: string;
 }
 
 export interface StudentFile {

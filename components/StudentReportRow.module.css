@@ -41,6 +41,14 @@
   gap: 12px;
 }
 
+.subjectLine {
+  margin: 0;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .gradeLine {
   margin: 0;
   font-size: 14px;

@@ -1,16 +1,62 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { buildTextGradingPrompt } from '@/lib/prompt';
+import { buildSubjectDetectionPrompt, buildTextGradingPrompt } from '@/lib/prompt';
 import { parseGradingResponse } from '@/lib/parseGradingResponse';
+import { SUBJECTS } from '@/lib/subjectIcons';
+
+const GENERAL_SUBJECT = 'General / Other';
+const DETECTABLE_SUBJECTS = SUBJECTS.filter(s => s !== GENERAL_SUBJECT);
 
 interface GradeRequestBody {
   ocrText?: string;
-  subject?: string;
   level?: string;
 }
 
 interface GroqResponse {
   choices?: { message?: { content?: string } }[];
   error?: { message?: string };
+}
+
+async function callGroq(apiKey: string, model: string, prompt: string, jsonMode: boolean): Promise<string> {
+  let resp: Response;
+  try {
+    resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: 'user', content: prompt }],
+        ...(jsonMode ? { response_format: { type: 'json_object' } } : {})
+      })
+    });
+  } catch (err) {
+    throw new Error(`Could not reach Groq API: ${(err as Error).message}`);
+  }
+
+  let data: GroqResponse;
+  try {
+    data = await resp.json();
+  } catch {
+    throw new Error(`Groq API returned a non-JSON response (status ${resp.status})`);
+  }
+
+  if (!resp.ok) {
+    throw new Error(data.error?.message || `Groq API error (status ${resp.status})`);
+  }
+
+  const text = data.choices?.[0]?.message?.content;
+  if (!text) {
+    throw new Error('Groq API response had no text content');
+  }
+  return text;
+}
+
+function normalizeDetectedSubject(raw: string): string {
+  const cleaned = raw.trim().replace(/^["'.\s]+|["'.\s]+$/g, '');
+  const match = SUBJECTS.find(s => s.toLowerCase() === cleaned.toLowerCase());
+  return match ?? GENERAL_SUBJECT;
 }
 
 export async function POST(req: NextRequest) {
@@ -27,58 +73,36 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const { ocrText, subject, level } = body;
+  const { ocrText, level } = body;
   if (!ocrText || typeof ocrText !== 'string') {
     return NextResponse.json({ error: 'Request body must include an "ocrText" string' }, { status: 400 });
   }
-  if (!subject || !level) {
-    return NextResponse.json({ error: 'Request body must include "subject" and "level"' }, { status: 400 });
+  if (!level) {
+    return NextResponse.json({ error: 'Request body must include "level"' }, { status: 400 });
   }
 
-  const prompt = buildTextGradingPrompt(subject, level, ocrText);
-
-  let groqResp: Response;
+  let detectedSubject: string;
   try {
-    groqResp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        authorization: `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: 'user', content: prompt }],
-        response_format: { type: 'json_object' }
-      })
-    });
+    const detectionPrompt = buildSubjectDetectionPrompt(ocrText, DETECTABLE_SUBJECTS);
+    const rawDetected = await callGroq(apiKey, model, detectionPrompt, false);
+    detectedSubject = normalizeDetectedSubject(rawDetected);
   } catch (err) {
-    return NextResponse.json({ error: `Could not reach Groq API: ${(err as Error).message}` }, { status: 502 });
+    // Subject detection is a best-effort step - fall back to General rather
+    // than failing the whole grading pass if only this call breaks.
+    detectedSubject = GENERAL_SUBJECT;
   }
 
-  let data: GroqResponse;
+  const gradingPrompt = buildTextGradingPrompt(detectedSubject, level, ocrText);
+
+  let text: string;
   try {
-    data = await groqResp.json();
-  } catch {
-    return NextResponse.json(
-      { error: `Groq API returned a non-JSON response (status ${groqResp.status})` },
-      { status: 502 }
-    );
-  }
-
-  if (!groqResp.ok) {
-    return NextResponse.json(
-      { error: data.error?.message || `Groq API error (status ${groqResp.status})` },
-      { status: groqResp.status }
-    );
-  }
-
-  const text = data.choices?.[0]?.message?.content;
-  if (!text) {
-    return NextResponse.json({ error: 'Groq API response had no text content' }, { status: 502 });
+    text = await callGroq(apiKey, model, gradingPrompt, true);
+  } catch (err) {
+    return NextResponse.json({ error: (err as Error).message }, { status: 502 });
   }
 
   try {
-    const result = parseGradingResponse(text);
+    const result = parseGradingResponse(text, detectedSubject);
     return NextResponse.json(result, { status: 200 });
   } catch (err) {
     return NextResponse.json({ error: (err as Error).message }, { status: 502 });

@@ -47,6 +47,7 @@ export default function Dashboard({ files, onTeacherFeedbackChange, onExport, ex
               <th className={styles.caretCol}></th>
               <th>Student ID</th>
               <th>File</th>
+              <th>Subject</th>
               <th>Questions</th>
               <th>Score</th>
             </tr>
@@ -63,6 +64,7 @@ export default function Dashboard({ files, onTeacherFeedbackChange, onExport, ex
                     <td className={styles.caret}>{isOpen ? '▾' : '▸'}</td>
                     <td className={styles.studentId}>{f.studentId}</td>
                     <td className={styles.fileName}>{f.fileName}</td>
+                    <td className={styles.subjectCol}>{r.detectedSubject}</td>
                     <td>{r.questions.length}</td>
                     <td>
                       <span className={`${styles.gradePill} ${styles[band]}`}>{grade}</span>
@@ -73,7 +75,7 @@ export default function Dashboard({ files, onTeacherFeedbackChange, onExport, ex
                   </tr>
                   {isOpen && (
                     <tr className={styles.detailRow}>
-                      <td colSpan={5}>
+                      <td colSpan={6}>
                         <StudentReportRow file={f} onTeacherFeedbackChange={text => onTeacherFeedbackChange(f.id, text)} />
                       </td>
                     </tr>

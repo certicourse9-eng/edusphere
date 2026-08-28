@@ -37,18 +37,8 @@
   color: var(--text);
 }
 
-.subjectRow {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.subjectRow select {
-  flex: 1;
-}
-
-.engineHint {
-  margin: 8px 0 0;
+.autoSubjectNote {
+  margin: 0 0 18px;
   font-size: 11.5px;
   color: var(--text-soft);
   line-height: 1.4;
