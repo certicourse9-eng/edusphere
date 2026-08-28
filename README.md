@@ -185,8 +185,35 @@ questions-array UI just always has exactly one item for those two types.
    mismatch (no scores) if it doesn't.
 5. Graded students appear in the dashboard: click a row to see the subject
    that was actually used (or detected, if it mismatched), an animated
-   score ring, an approximate grade, per-question breakdowns, the raw OCR
+   score ring, an approximate grade, per-question breakdowns, an
+   **Annotated paper** tab with the feedback highlighted directly on the
+   scanned page (click a highlight to see what it's about), the raw OCR
    text, and a place to add your own feedback (auto-saved as you type).
+6. Use the **search box** above the mark sheet to jump straight to a
+   specific student by ID or filename.
+
+## On-paper highlighting (`components/AnnotatedPageView.tsx`)
+
+Each grading pass also returns an `annotations` array: specific points
+(strength / weakness / suggestion / criterion note) tied to exact lines on
+the page, via the `[L#]` line markers `lib/gradeClient.ts` embeds in the
+OCR'd text before sending it for grading. `AnnotatedPageView` resolves
+those line numbers back to PaddleOCR's real pixel bounding boxes (captured
+in `app/api/ocr/route.ts` via `rec_boxes`, confirmed against a live
+response) and renders them as clickable colored overlays on PaddleOCR's own
+rendered page image — downloaded and re-served as a base64 data URL server
+-side specifically so it doesn't depend on PaddleOCR's signed URL staying
+valid.
+
+Known limitations of this piece specifically:
+- An annotation's highlight is the union bounding box of every line it
+  references — for a multi-line annotation this can highlight a slightly
+  larger rectangle than the exact relevant words, not word-level precision.
+- Overlapping annotations on the same lines render as stacked, semi
+  -transparent boxes; only the topmost one is clickable at any given pixel.
+- Base64-encoding page images pushes up the `/api/ocr` response size,
+  which could approach Vercel's request body limit for a many-page or
+  very high-resolution scan.
 6. **Export CSV** downloads one row per graded student.
 
 ## Important: demo scores, not an official IB grade
