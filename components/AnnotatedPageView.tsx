@@ -141,7 +141,6 @@ export default function AnnotatedPageView({ pages, annotations }: AnnotatedPageV
               </div>
               {marks.map((m, i) => {
                 const isActive = hoveredGroup === m.groupKey;
-                const flipDown = m.topPct < 22;
                 return (
                   <button
                     key={m.key}
@@ -160,25 +159,41 @@ export default function AnnotatedPageView({ pages, annotations }: AnnotatedPageV
                     onBlur={() => setHoveredGroup(prev => (prev === m.groupKey ? null : prev))}
                     onClick={() => setHoveredGroup(prev => (prev === m.groupKey ? null : m.groupKey))}
                     aria-label={`${ANNOTATION_TYPE_LABELS[m.annotation.type]}: ${m.annotation.comment}`}
-                  >
-                    {m.isFirstInGroup && (
+                  />
+                );
+              })}
+              {/* Sparkle and tooltip render as siblings of the highlight buttons, NOT nested
+                  inside one - a `.mark` button has opacity ~0.6-0.85 for the highlighter look,
+                  and CSS opacity on a parent drags every descendant down with it, which made an
+                  earlier version of the tooltip render semi-transparent (the page's own text
+                  visibly showed through the "opaque" popup). */}
+              {marks
+                .filter(m => m.isFirstInGroup)
+                .map(m => {
+                  const isActive = hoveredGroup === m.groupKey;
+                  const flipDown = m.topPct < 22;
+                  return (
+                    <div
+                      key={`extras-${m.groupKey}`}
+                      className={styles.markAnchor}
+                      style={{ left: `${m.leftPct}%`, top: `${m.topPct}%`, width: `${m.widthPct}%`, height: `${m.heightPct}%` }}
+                    >
                       <span className={styles.sparkle} aria-hidden="true">
                         ✨
                       </span>
-                    )}
-                    {m.isFirstInGroup && isActive && (
-                      <div className={`${styles.tooltip} ${flipDown ? styles.tooltipDown : styles.tooltipUp}`}>
-                        <span className={`${styles.tooltipBadge} ${styles[m.annotation.type]}`}>
-                          <span aria-hidden="true">{TYPE_ICON[m.annotation.type]}</span>
-                          {ANNOTATION_TYPE_LABELS[m.annotation.type]}
-                          {m.annotation.criterionCode ? ` · ${m.annotation.criterionCode}` : ''}
-                        </span>
-                        <p className={styles.tooltipComment}>{m.annotation.comment}</p>
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
+                      {isActive && (
+                        <div className={`${styles.tooltip} ${flipDown ? styles.tooltipDown : styles.tooltipUp}`}>
+                          <span className={`${styles.tooltipBadge} ${styles[m.annotation.type]}`}>
+                            <span aria-hidden="true">{TYPE_ICON[m.annotation.type]}</span>
+                            {ANNOTATION_TYPE_LABELS[m.annotation.type]}
+                            {m.annotation.criterionCode ? ` · ${m.annotation.criterionCode}` : ''}
+                          </span>
+                          <p className={styles.tooltipComment}>{m.annotation.comment}</p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               {marks
                 .filter(m => m.isFirstInGroup)
                 .map(m => {

@@ -190,6 +190,14 @@
   }
 }
 
+/* A plain, full-opacity positioned box matching one highlighted line's extent - exists only
+   so the sparkle/tooltip inside it can be sized/centered against that line without being
+   nested inside (and therefore dimmed by) the highlight's own semi-transparent `.mark` button. */
+.markAnchor {
+  position: absolute;
+  pointer-events: none;
+}
+
 .sparkle {
   position: absolute;
   top: -10px;
