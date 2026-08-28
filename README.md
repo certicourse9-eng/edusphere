@@ -1,22 +1,25 @@
 # EduSphere (Next.js)
 
 A teacher-facing tool that bulk-uploads scanned IB answer-sheet PDFs and
-grades them: **PaddleOCR** reads each PDF, then **Groq** (running OpenAI's
-open-weight GPT-OSS 120B) auto-detects which subject the content actually
-belongs to and reasons over the extracted text against that subject's own
-IB-style marking criteria to produce suggested marks and feedback. Both API
-keys are read server-side only — neither ever reaches the browser. Both
-services have genuinely free tiers with no billing/card requirement.
+grades them: the teacher picks a **subject** before uploading, **PaddleOCR**
+reads each PDF, then **Groq** (running OpenAI's open-weight GPT-OSS 120B)
+verifies the sheet's actual content matches that subject before reasoning
+over it against that subject's own IB-style marking criteria to produce
+suggested marks and feedback. If the content clearly belongs to a
+*different* subject than the one picked, the sheet is flagged as a
+mismatch instead of graded. Both API keys are read server-side only —
+neither ever reaches the browser. Both services have genuinely free tiers
+with no billing/card requirement.
 
 ```
-Upload PDF → Next.js API route → PaddleOCR → extracted text
-  → subject detection (Groq) → per-subject IB marking criteria
+Upload PDF (subject pre-selected) → Next.js API route → PaddleOCR → extracted text
+  → subject verification (Groq) → match? → per-subject IB marking criteria
+                                 → mismatch? → flagged, not graded
   → grading pass (Groq) → suggested marks + feedback → teacher review
 ```
 
-There's no manual subject picker — the subject shown on each report is
-whatever the model determined from the sheet's actual content, falling back
-to "General / Other" if it can't confidently tell.
+Selecting **"General / Other"** skips verification entirely and always
+grades with general criteria — there's nothing to mismatch against.
 
 ## Setup
 
@@ -64,18 +67,28 @@ your own machine instead of the hosted API) if you'd rather avoid an
 external OCR service entirely — swap `app/api/ocr/route.ts` to call it via
 `OCR_SERVICE_URL` if so.
 
-## Groq (subject detection + grading/reasoning)
+## Groq (subject verification + grading/reasoning)
 
-`app/api/grade/route.ts` makes **two** Groq calls per sheet:
+`app/api/grade/route.ts` accepts the teacher's selected `subject` plus the
+OCR'd text, and (unless `subject` is `General / Other`) makes **two** Groq
+calls per sheet:
 
-1. **Detection**: `buildSubjectDetectionPrompt` (`lib/prompt.ts`) asks the
-   model to classify the OCR'd text against the known subject list
-   (`lib/subjectIcons.ts`), or respond `General / Other` if none clearly
-   match. The raw response is normalized/validated against that list
-   server-side (`normalizeDetectedSubject`) — if the model returns anything
-   that doesn't exactly match a known subject, or the call fails outright,
-   it falls back to `General / Other` rather than breaking the whole grade.
-2. **Grading**: `buildTextGradingPrompt` is built using that detected
+1. **Verification**: `buildSubjectDetectionPrompt` (`lib/prompt.ts`) asks
+   the model to classify the OCR'd text against the known subject list
+   (`lib/subjectIcons.ts`), independent of what the teacher picked, or
+   respond `General / Other` if none clearly match. The raw response is
+   normalized/validated against that list server-side
+   (`normalizeDetectedSubject`) — anything that doesn't exactly match a
+   known subject, or a failed call, falls back to `General / Other`.
+   - If the detected subject is a **specific subject different from** the
+     teacher's selection, the route returns immediately with a
+     `"Subject mismatch: ..."` error and empty scores (`mismatchResult` in
+     `app/api/grade/route.ts`) — no grading call is made.
+   - If detection matches, or comes back inconclusive (`General / Other`),
+     grading proceeds using the **teacher's selected subject** (giving the
+     benefit of the doubt when detection itself is uncertain, rather than
+     blocking on it).
+2. **Grading**: `buildTextGradingPrompt` is built using the selected
    subject's assessment objectives (`lib/subjectObjectives.ts` — real,
    distinct objectives per subject group: sciences, math, individuals &
    societies, language & literature; not one generic rubric for everything).
@@ -86,8 +99,9 @@ Both calls go to Groq's OpenAI-compatible chat completions endpoint
 {type: "json_object"}` so the model is constrained to return structured
 JSON; the response is parsed by `lib/parseGradingResponse.ts`, which also
 tolerates markdown fences or stray commentary if a model adds them anyway.
-The detected subject is attached to the result (`detectedSubject`) and
-shown in the report, the mark-sheet table, and the CSV export.
+The subject actually used (or, on mismatch, the one detected instead) is
+attached to the result (`detectedSubject`) and shown in the report, the
+mark-sheet table, and the CSV export.
 
 `GROQ_API_KEY` is read only inside this server-only route handler, so it's
 never bundled into client-side code or sent to the browser. Without it set,
@@ -113,18 +127,20 @@ for a different model Groq hosts if you want.
 
 ## How it works
 
-1. Upload PDFs by dragging them onto the dropzone or clicking to browse.
-2. Each student's ID is derived from their filename (first run of digits, or
+1. Pick the **Subject** and **Level** for the batch you're about to upload.
+2. Upload PDFs by dragging them onto the dropzone or clicking to browse.
+3. Each student's ID is derived from their filename (first run of digits, or
    the filename itself if there are no digits).
-3. Click **Grade sheets**. Files are processed **sequentially, one at a
+4. Click **Grade sheets**. Files are processed **sequentially, one at a
    time**: each is OCR'd via `/api/ocr`, then the extracted text is sent to
-   `/api/grade`, which detects the subject, grades against that subject's
-   criteria, and returns parsed JSON (or a structured error) to the browser.
-4. Graded students appear in the dashboard: click a row to see the detected
-   subject, an animated score ring, an approximate grade, per-question
-   breakdowns, the raw OCR text, and a place to add your own feedback
-   (auto-saved as you type).
-5. **Export CSV** downloads one row per graded student.
+   `/api/grade`, which verifies the content matches the selected subject,
+   grades against that subject's criteria if it does, or returns a subject
+   mismatch (no scores) if it doesn't.
+5. Graded students appear in the dashboard: click a row to see the subject
+   that was actually used (or detected, if it mismatched), an animated
+   score ring, an approximate grade, per-question breakdowns, the raw OCR
+   text, and a place to add your own feedback (auto-saved as you type).
+6. **Export CSV** downloads one row per graded student.
 
 ## Important: demo scores, not an official IB grade
 
