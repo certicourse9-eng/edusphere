@@ -13,8 +13,9 @@ interface AnnotatedPageViewProps {
 interface LineMark {
   key: string;
   /** Shared by every line belonging to the same annotation on the same page, so hovering
-   *  any one of them (and the tooltip/sparkle, which render once per group) act together. */
+   *  any one of them (and the tooltip/sparkle/dino, which render once per group) act together. */
   groupKey: string;
+  annotationIndex: number;
   annotation: Annotation;
   isFirstInGroup: boolean;
   leftPct: number;
@@ -33,6 +34,16 @@ const TYPE_ICON: Record<Annotation['type'], string> = {
   weakness: '💥',
   suggestion: '💡',
   criterion: '🎯'
+};
+
+/** Short reaction words the dino mascot shows next to each highlighted line - picked by
+ *  annotationIndex (not random) so re-renders stay stable and there's some variety when a
+ *  sheet has several annotations of the same type. */
+const MASCOT_WORDS: Record<Annotation['type'], string[]> = {
+  strength: ['Great!', 'Nice!', 'Awesome!', 'Well done!'],
+  weakness: ['Oops!', 'Uh-oh!', 'Fix this!', 'Missed it!'],
+  suggestion: ['Try this!', 'Good idea!', 'Consider this!'],
+  criterion: ['Note!', 'Heads up!']
 };
 
 /** Assigns each line across all pages the same global index buildLineMarkedText used
@@ -80,6 +91,7 @@ function computePageMarks(pages: OcrPage[], annotations: Annotation[], dims: Rec
         perPage[pageIndex].push({
           key: `${groupKey}-${li}`,
           groupKey,
+          annotationIndex,
           annotation,
           isFirstInGroup: idx === 0,
           leftPct: (Math.max(0, x1 - pad) / pageDims.w) * 100,
@@ -106,8 +118,8 @@ export default function AnnotatedPageView({ pages, annotations }: AnnotatedPageV
   return (
     <div className={styles.wrap}>
       <p className={styles.hint}>
-        <span aria-hidden="true">✨</span> Hover an underlined section to see the feedback tied to it &mdash; tap it on touch
-        devices.
+        <span aria-hidden="true">🦕</span> Each highlighted line has a dino reacting to it &mdash; hover it (or the
+        highlight) for the full comment. Tap on touch devices.
       </p>
       {pages.map((page, pageIndex) => {
         if (!page.imageDataUrl) return null;
@@ -167,6 +179,44 @@ export default function AnnotatedPageView({ pages, annotations }: AnnotatedPageV
                   </button>
                 );
               })}
+              {marks
+                .filter(m => m.isFirstInGroup)
+                .map(m => {
+                  const isActive = hoveredGroup === m.groupKey;
+                  const words = MASCOT_WORDS[m.annotation.type];
+                  const word = words[m.annotationIndex % words.length];
+                  // If the line runs close to the page's right edge there's no room to sit
+                  // beside it without overlapping the last word - drop below the line instead.
+                  const rightMargin = 100 - (m.leftPct + m.widthPct);
+                  const placeBelow = rightMargin < 24;
+                  const dinoLeftPct = placeBelow ? m.leftPct : Math.min(m.leftPct + m.widthPct + 2.5, 90);
+                  const dinoTopPct = placeBelow ? m.topPct + m.heightPct + 1.5 : m.topPct + m.heightPct / 2;
+                  return (
+                    <button
+                      key={`dino-${m.groupKey}`}
+                      type="button"
+                      className={`${styles.dino} ${styles[m.annotation.type]} ${isActive ? styles.dinoActive : ''}`}
+                      style={{
+                        left: `${dinoLeftPct}%`,
+                        top: `${dinoTopPct}%`,
+                        transform: placeBelow ? undefined : 'translateY(-50%)'
+                      }}
+                      onMouseEnter={() => setHoveredGroup(m.groupKey)}
+                      onMouseLeave={() => setHoveredGroup(prev => (prev === m.groupKey ? null : prev))}
+                      onFocus={() => setHoveredGroup(m.groupKey)}
+                      onBlur={() => setHoveredGroup(prev => (prev === m.groupKey ? null : prev))}
+                      onClick={() => setHoveredGroup(prev => (prev === m.groupKey ? null : m.groupKey))}
+                      aria-label={`${ANNOTATION_TYPE_LABELS[m.annotation.type]} mascot: ${word}`}
+                    >
+                      <span className={styles.dinoInner}>
+                        <span className={styles.dinoBubble}>{word}</span>
+                        <span className={styles.dinoEmoji} aria-hidden="true">
+                          🦕
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
             </div>
             <span className={styles.pageLabel}>Page {pageIndex + 1}</span>
           </div>

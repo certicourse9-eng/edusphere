@@ -69,54 +69,147 @@
 
 .mark.strength {
   background: var(--green);
-  opacity: 0.42;
+  opacity: 0.62;
   border-radius: 3px 7px 4px 8px / 6px 3px 7px 4px;
 }
 
 .mark.weakness {
   background: var(--coral);
-  opacity: 0.42;
+  opacity: 0.62;
   border-radius: 7px 3px 8px 4px / 3px 6px 4px 7px;
 }
 
 .mark.suggestion {
   background: var(--amber);
-  opacity: 0.42;
+  opacity: 0.62;
   border-radius: 4px 8px 3px 7px / 7px 4px 6px 3px;
 }
 
 .mark.criterion {
   background: var(--primary);
-  opacity: 0.4;
+  opacity: 0.58;
   border-radius: 8px 4px 7px 3px / 4px 7px 3px 6px;
 }
 
 .mark:hover,
 .markActive {
-  opacity: 0.62 !important;
+  opacity: 0.85 !important;
   transform: rotate(0deg) scale(1.02);
   z-index: 20;
 }
 
+/* A tiny dino mascot sitting in the margin next to each highlighted line, reacting with a
+   short word ("Great!"/"Oops!"/...) so a teacher can tell at a glance whether a line is a
+   strength or a problem without reading the full comment. Positioned to the right of the
+   line's own text extent so it never sits on top of the student's handwriting. */
+.dino {
+  position: absolute;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  z-index: 6;
+}
+
+.dino:hover,
+.dinoActive {
+  z-index: 25;
+}
+
+/* The bob animation lives on an inner wrapper, decoupled from the button's own
+   positioning transform (which differs depending on whether the dino sits beside
+   the line, vertically centered, or dropped below it near the page edge). */
+.dinoInner {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  animation: dinoBob 2.4s ease-in-out infinite;
+}
+
+.dino:hover .dinoInner,
+.dinoActive .dinoInner {
+  animation-play-state: paused;
+}
+
+.dinoEmoji {
+  font-size: 19px;
+  line-height: 1;
+  filter: drop-shadow(0 1px 2px rgba(23, 27, 46, 0.18));
+  transition: transform 150ms ease;
+  display: inline-block;
+}
+
+.dino:hover .dinoEmoji,
+.dinoActive .dinoEmoji {
+  transform: scale(1.18) rotate(-6deg);
+}
+
+.dinoBubble {
+  font-family: var(--font-sora), sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 12px 12px 12px 3px;
+  white-space: nowrap;
+  box-shadow: 0 3px 8px rgba(23, 27, 46, 0.12);
+  transition: transform 150ms ease;
+}
+
+.dino:hover .dinoBubble,
+.dinoActive .dinoBubble {
+  transform: scale(1.05);
+}
+
+.dino.strength .dinoBubble {
+  background: #eafbf1;
+  color: var(--green);
+}
+
+.dino.weakness .dinoBubble {
+  background: #ffeeee;
+  color: var(--coral);
+}
+
+.dino.suggestion .dinoBubble {
+  background: #fef6e7;
+  color: var(--amber);
+}
+
+.dino.criterion .dinoBubble {
+  background: #eaf2ff;
+  color: var(--primary);
+}
+
+@keyframes dinoBob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
 .sparkle {
   position: absolute;
-  top: -9px;
-  right: -7px;
-  font-size: 12px;
+  top: -10px;
+  left: -6px;
+  font-size: 15px;
   line-height: 1;
   pointer-events: none;
-  animation: sparkleTwinkle 2.6s ease-in-out infinite;
+  filter: drop-shadow(0 1px 2px rgba(23, 27, 46, 0.2));
+  animation: sparkleTwinkle 2.2s ease-in-out infinite;
 }
 
 @keyframes sparkleTwinkle {
   0%,
   100% {
-    opacity: 0.35;
-    transform: scale(0.85) rotate(-8deg);
+    opacity: 0.6;
+    transform: scale(0.9) rotate(-8deg);
   }
   50% {
     opacity: 1;
-    transform: scale(1.05) rotate(8deg);
+    transform: scale(1.15) rotate(8deg);
   }
 }
 
