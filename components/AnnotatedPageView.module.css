@@ -30,6 +30,7 @@
 .pageImageWrap {
   position: relative;
   width: 100%;
+  isolation: isolate;
 }
 
 .pageImageClip {
@@ -51,64 +52,50 @@
   text-align: center;
 }
 
-/* Hand-drawn highlighter-marker look: an asymmetric border-radius plus a
-   slight rotation (per-highlight, via --wobble) instead of a plain rectangle. */
-.highlight {
+/* A real highlighter-marker stroke laid directly over each OCR line's own text extent
+   (never merged across lines, so it never drifts over blank space or unrelated lines) -
+   solid translucent color, text still readable through it, slightly uneven hand-drawn
+   edges instead of a crisp rectangle. No outline/border - the stroke of color IS the mark. */
+.mark {
   position: absolute;
-  border-radius: 40% 44% 42% 46% / 46% 42% 46% 42%;
   cursor: pointer;
   padding: 0;
+  border: none;
+  mix-blend-mode: multiply;
   transform: rotate(var(--wobble, 0deg));
-  transform-origin: center;
-  transition: transform 160ms ease, filter 160ms ease, box-shadow 160ms ease;
+  transition: filter 150ms ease, transform 150ms ease;
   z-index: 2;
 }
 
-.highlight:hover,
-.highlightActive {
-  transform: rotate(0deg) scale(1.04);
-  filter: brightness(1.03);
+.mark.strength {
+  background: var(--green);
+  opacity: 0.42;
+  border-radius: 3px 7px 4px 8px / 6px 3px 7px 4px;
+}
+
+.mark.weakness {
+  background: var(--coral);
+  opacity: 0.42;
+  border-radius: 7px 3px 8px 4px / 3px 6px 4px 7px;
+}
+
+.mark.suggestion {
+  background: var(--amber);
+  opacity: 0.42;
+  border-radius: 4px 8px 3px 7px / 7px 4px 6px 3px;
+}
+
+.mark.criterion {
+  background: var(--primary);
+  opacity: 0.4;
+  border-radius: 8px 4px 7px 3px / 4px 7px 3px 6px;
+}
+
+.mark:hover,
+.markActive {
+  opacity: 0.62 !important;
+  transform: rotate(0deg) scale(1.02);
   z-index: 20;
-}
-
-.highlight.strength {
-  background: rgba(47, 191, 113, 0.3);
-  border: 2px dashed rgba(47, 191, 113, 0.65);
-}
-
-.highlight.weakness {
-  background: rgba(255, 107, 107, 0.3);
-  border: 2px dashed rgba(255, 107, 107, 0.65);
-}
-
-.highlight.suggestion {
-  background: rgba(245, 166, 35, 0.3);
-  border: 2px dashed rgba(245, 166, 35, 0.65);
-}
-
-.highlight.criterion {
-  background: rgba(76, 141, 255, 0.26);
-  border: 2px dashed rgba(76, 141, 255, 0.65);
-}
-
-.highlight.strength.highlightActive,
-.highlight.strength:hover {
-  box-shadow: 0 0 0 4px rgba(47, 191, 113, 0.18);
-}
-
-.highlight.weakness.highlightActive,
-.highlight.weakness:hover {
-  box-shadow: 0 0 0 4px rgba(255, 107, 107, 0.18);
-}
-
-.highlight.suggestion.highlightActive,
-.highlight.suggestion:hover {
-  box-shadow: 0 0 0 4px rgba(245, 166, 35, 0.18);
-}
-
-.highlight.criterion.highlightActive,
-.highlight.criterion:hover {
-  box-shadow: 0 0 0 4px rgba(76, 141, 255, 0.18);
 }
 
 .sparkle {
@@ -119,7 +106,6 @@
   line-height: 1;
   pointer-events: none;
   animation: sparkleTwinkle 2.6s ease-in-out infinite;
-  animation-delay: var(--sparkleDelay, 0s);
 }
 
 @keyframes sparkleTwinkle {
@@ -244,9 +230,9 @@
 
 .legendSwatch {
   display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 3px;
+  width: 14px;
+  height: 4px;
+  border-radius: 2px;
 }
 
 .legendSwatch.strength {

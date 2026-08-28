@@ -10,9 +10,13 @@ interface AnnotatedPageViewProps {
   annotations: Annotation[];
 }
 
-interface HighlightBox {
+interface LineMark {
   key: string;
+  /** Shared by every line belonging to the same annotation on the same page, so hovering
+   *  any one of them (and the tooltip/sparkle, which render once per group) act together. */
+  groupKey: string;
   annotation: Annotation;
+  isFirstInGroup: boolean;
   leftPct: number;
   topPct: number;
   widthPct: number;
@@ -33,12 +37,14 @@ const TYPE_ICON: Record<Annotation['type'], string> = {
 
 /** Assigns each line across all pages the same global index buildLineMarkedText used
  *  ([L0], [L1], ...), so annotation.lineStart/lineEnd can be resolved back to (page, line)
- *  without needing to re-run any matching. Highlight boxes are expressed as percentages of
- *  each page's REAL rendered image dimensions (passed in once the <img> has loaded) - PaddleOCR
- *  doesn't report page dimensions, so falling back to "furthest text extent seen" instead of the
- *  real image size (an earlier version of this) drifts whenever text doesn't reach the margins. */
-function computePageHighlights(pages: OcrPage[], annotations: Annotation[], dims: Record<number, ImageDims>): HighlightBox[][] {
-  const perPage: HighlightBox[][] = pages.map(() => []);
+ *  without needing to re-run any matching. Marks are computed PER LINE (never merged into one
+ *  box spanning multiple lines) so each one hugs its own real text tightly - merging produced
+ *  an oversized blob that could swallow whitespace or unrelated lines between the first and
+ *  last line of a multi-line annotation. Percentages are relative to each page's REAL rendered
+ *  image dimensions (passed in once the <img> has loaded), since PaddleOCR doesn't report page
+ *  dimensions itself. */
+function computePageMarks(pages: OcrPage[], annotations: Annotation[], dims: Record<number, ImageDims>): LineMark[][] {
+  const perPage: LineMark[][] = pages.map(() => []);
   let globalIndex = 0;
   const lineLocation: { pageIndex: number; lineIndex: number }[] = [];
   pages.forEach((page, pageIndex) => {
@@ -52,8 +58,6 @@ function computePageHighlights(pages: OcrPage[], annotations: Annotation[], dims
     const lo = Math.min(annotation.lineStart, annotation.lineEnd);
     const hi = Math.max(annotation.lineStart, annotation.lineEnd);
 
-    // Group the annotation's constituent lines by the page they fall on,
-    // since an annotation could (rarely) span a page break.
     const byPage = new Map<number, number[]>();
     for (let i = lo; i <= hi; i++) {
       const loc = lineLocation[i];
@@ -66,29 +70,23 @@ function computePageHighlights(pages: OcrPage[], annotations: Annotation[], dims
       const page = pages[pageIndex];
       const pageDims = dims[pageIndex];
       if (!page || !pageDims) return;
-      let minX = Infinity;
-      let minY = Infinity;
-      let maxX = -Infinity;
-      let maxY = -Infinity;
-      lineIndices.forEach(li => {
+      const groupKey = `${annotationIndex}-${pageIndex}`;
+      const sorted = [...lineIndices].sort((a, b) => a - b);
+      sorted.forEach((li, idx) => {
         const line = page.lines[li];
         if (!line) return;
         const [x1, y1, x2, y2] = line.box;
-        minX = Math.min(minX, x1);
-        minY = Math.min(minY, y1);
-        maxX = Math.max(maxX, x2);
-        maxY = Math.max(maxY, y2);
-      });
-      if (!Number.isFinite(minX)) return;
-
-      const pad = 5;
-      perPage[pageIndex].push({
-        key: `${annotationIndex}-${pageIndex}`,
-        annotation,
-        leftPct: (Math.max(0, minX - pad) / pageDims.w) * 100,
-        topPct: (Math.max(0, minY - pad) / pageDims.h) * 100,
-        widthPct: ((maxX - minX + pad * 2) / pageDims.w) * 100,
-        heightPct: ((maxY - minY + pad * 2) / pageDims.h) * 100
+        const pad = 3;
+        perPage[pageIndex].push({
+          key: `${groupKey}-${li}`,
+          groupKey,
+          annotation,
+          isFirstInGroup: idx === 0,
+          leftPct: (Math.max(0, x1 - pad) / pageDims.w) * 100,
+          topPct: (Math.max(0, y1 - pad) / pageDims.h) * 100,
+          widthPct: ((x2 - x1 + pad * 2) / pageDims.w) * 100,
+          heightPct: ((y2 - y1 + pad * 2) / pageDims.h) * 100
+        });
       });
     });
   });
@@ -97,9 +95,9 @@ function computePageHighlights(pages: OcrPage[], annotations: Annotation[], dims
 }
 
 export default function AnnotatedPageView({ pages, annotations }: AnnotatedPageViewProps) {
-  const [hoveredKey, setHoveredKey] = useState<string | null>(null);
+  const [hoveredGroup, setHoveredGroup] = useState<string | null>(null);
   const [dims, setDims] = useState<Record<number, ImageDims>>({});
-  const perPageHighlights = useMemo(() => computePageHighlights(pages, annotations, dims), [pages, annotations, dims]);
+  const perPageMarks = useMemo(() => computePageMarks(pages, annotations, dims), [pages, annotations, dims]);
 
   if (pages.length === 0 || pages.every(p => !p.imageDataUrl)) {
     return <p className={styles.emptyNote}>No page images available to annotate for this sheet.</p>;
@@ -108,12 +106,12 @@ export default function AnnotatedPageView({ pages, annotations }: AnnotatedPageV
   return (
     <div className={styles.wrap}>
       <p className={styles.hint}>
-        <span aria-hidden="true">✨</span> Hover a highlighted section to see the feedback tied to it &mdash; tap it on touch
+        <span aria-hidden="true">✨</span> Hover an underlined section to see the feedback tied to it &mdash; tap it on touch
         devices.
       </p>
       {pages.map((page, pageIndex) => {
         if (!page.imageDataUrl) return null;
-        const highlights = perPageHighlights[pageIndex] || [];
+        const marks = perPageMarks[pageIndex] || [];
         return (
           <div key={pageIndex} className={styles.pageBlock}>
             <div className={styles.pageImageWrap}>
@@ -129,40 +127,41 @@ export default function AnnotatedPageView({ pages, annotations }: AnnotatedPageV
                   }}
                 />
               </div>
-              {highlights.map((h, i) => {
-                const isHovered = hoveredKey === h.key;
-                const flipDown = h.topPct < 22;
+              {marks.map((m, i) => {
+                const isActive = hoveredGroup === m.groupKey;
+                const flipDown = m.topPct < 22;
                 return (
                   <button
-                    key={h.key}
+                    key={m.key}
                     type="button"
-                    className={`${styles.highlight} ${styles[h.annotation.type]} ${isHovered ? styles.highlightActive : ''}`}
+                    className={`${styles.mark} ${styles[m.annotation.type]} ${isActive ? styles.markActive : ''}`}
                     style={{
-                      left: `${h.leftPct}%`,
-                      top: `${h.topPct}%`,
-                      width: `${h.widthPct}%`,
-                      height: `${h.heightPct}%`,
-                      ['--wobble' as string]: i % 2 === 0 ? '-0.6deg' : '0.6deg',
-                      ['--sparkleDelay' as string]: `${(i % 5) * 0.35}s`
+                      left: `${m.leftPct}%`,
+                      top: `${m.topPct}%`,
+                      width: `${m.widthPct}%`,
+                      height: `${m.heightPct}%`,
+                      ['--wobble' as string]: i % 2 === 0 ? '-0.7deg' : '0.7deg'
                     }}
-                    onMouseEnter={() => setHoveredKey(h.key)}
-                    onMouseLeave={() => setHoveredKey(prev => (prev === h.key ? null : prev))}
-                    onFocus={() => setHoveredKey(h.key)}
-                    onBlur={() => setHoveredKey(prev => (prev === h.key ? null : prev))}
-                    onClick={() => setHoveredKey(prev => (prev === h.key ? null : h.key))}
-                    aria-label={`${ANNOTATION_TYPE_LABELS[h.annotation.type]}: ${h.annotation.comment}`}
+                    onMouseEnter={() => setHoveredGroup(m.groupKey)}
+                    onMouseLeave={() => setHoveredGroup(prev => (prev === m.groupKey ? null : prev))}
+                    onFocus={() => setHoveredGroup(m.groupKey)}
+                    onBlur={() => setHoveredGroup(prev => (prev === m.groupKey ? null : prev))}
+                    onClick={() => setHoveredGroup(prev => (prev === m.groupKey ? null : m.groupKey))}
+                    aria-label={`${ANNOTATION_TYPE_LABELS[m.annotation.type]}: ${m.annotation.comment}`}
                   >
-                    <span className={styles.sparkle} aria-hidden="true">
-                      ✨
-                    </span>
-                    {isHovered && (
+                    {m.isFirstInGroup && (
+                      <span className={styles.sparkle} aria-hidden="true">
+                        ✨
+                      </span>
+                    )}
+                    {m.isFirstInGroup && isActive && (
                       <div className={`${styles.tooltip} ${flipDown ? styles.tooltipDown : styles.tooltipUp}`}>
-                        <span className={`${styles.tooltipBadge} ${styles[h.annotation.type]}`}>
-                          <span aria-hidden="true">{TYPE_ICON[h.annotation.type]}</span>
-                          {ANNOTATION_TYPE_LABELS[h.annotation.type]}
-                          {h.annotation.criterionCode ? ` · ${h.annotation.criterionCode}` : ''}
+                        <span className={`${styles.tooltipBadge} ${styles[m.annotation.type]}`}>
+                          <span aria-hidden="true">{TYPE_ICON[m.annotation.type]}</span>
+                          {ANNOTATION_TYPE_LABELS[m.annotation.type]}
+                          {m.annotation.criterionCode ? ` · ${m.annotation.criterionCode}` : ''}
                         </span>
-                        <p className={styles.tooltipComment}>{h.annotation.comment}</p>
+                        <p className={styles.tooltipComment}>{m.annotation.comment}</p>
                       </div>
                     )}
                   </button>
