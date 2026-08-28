@@ -1,4 +1,4 @@
-import type { GradingResult, Level } from './types';
+import type { CourseworkType, GradingResult, Level } from './types';
 
 export function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -39,13 +39,18 @@ export async function ocrFile(pdfBase64: string): Promise<string> {
   return text;
 }
 
-export async function gradeText(ocrText: string, subject: string, level: Level): Promise<GradingResult> {
+export async function gradeText(
+  ocrText: string,
+  courseworkType: CourseworkType,
+  subject: string,
+  level: Level
+): Promise<GradingResult> {
   let resp: Response;
   try {
     resp = await fetch('/api/grade', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ocrText, subject, level })
+      body: JSON.stringify({ ocrText, courseworkType, subject, level })
     });
   } catch (err) {
     throw new Error(`Could not reach the grading server: ${(err as Error).message}`);
@@ -66,6 +71,7 @@ export interface GradeFileOutcome {
 
 export async function gradeFile(
   file: File,
+  courseworkType: CourseworkType,
   subject: string,
   level: Level,
   onOcrStart?: () => void
@@ -73,6 +79,6 @@ export async function gradeFile(
   const pdfBase64 = await fileToBase64(file);
   onOcrStart?.();
   const ocrText = await ocrFile(pdfBase64);
-  const result = await gradeText(ocrText, subject, level);
+  const result = await gradeText(ocrText, courseworkType, subject, level);
   return { result, ocrText };
 }

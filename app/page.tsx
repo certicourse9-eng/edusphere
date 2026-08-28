@@ -8,7 +8,7 @@ import HeroBlobs from '@/components/HeroBlobs';
 import { gradeFile } from '@/lib/gradeClient';
 import { deriveStudentId } from '@/lib/studentId';
 import { buildCsv, downloadCsv } from '@/lib/csv';
-import type { StudentFile, Level } from '@/lib/types';
+import type { StudentFile, Level, CourseworkType } from '@/lib/types';
 
 let idCounter = 0;
 function makeId(): string {
@@ -17,6 +17,7 @@ function makeId(): string {
 }
 
 export default function Page() {
+  const [courseworkType, setCourseworkType] = useState<CourseworkType>('external-assessment');
   const [subject, setSubject] = useState('Mathematics AA');
   const [level, setLevel] = useState<Level>('HL');
   const [files, setFiles] = useState<StudentFile[]>([]);
@@ -48,6 +49,7 @@ export default function Page() {
   const runPipeline = useCallback(async () => {
     if (running) return;
     setRunning(true);
+    const runCourseworkType = courseworkType;
     const runSubject = subject;
     const runLevel = level;
     const toRun = files.filter(f => f.status === 'queued' || f.status === 'error');
@@ -55,7 +57,7 @@ export default function Page() {
     for (const entry of toRun) {
       setFiles(prev => prev.map(f => (f.id === entry.id ? { ...f, status: 'processing', error: null } : f)));
       try {
-        const { result, ocrText } = await gradeFile(entry.file, runSubject, runLevel, () => {
+        const { result, ocrText } = await gradeFile(entry.file, runCourseworkType, runSubject, runLevel, () => {
           setFiles(prev => prev.map(f => (f.id === entry.id ? { ...f, status: 'ocr' } : f)));
         });
         setFiles(prev => prev.map(f => (f.id === entry.id ? { ...f, status: 'done', result, ocrText } : f)));
@@ -67,7 +69,7 @@ export default function Page() {
     }
 
     setRunning(false);
-  }, [files, running, subject, level]);
+  }, [files, running, courseworkType, subject, level]);
 
   const handleExport = useCallback(() => {
     downloadCsv(buildCsv(files), 'grading-results.csv');
@@ -95,6 +97,8 @@ export default function Page() {
       </div>
 
       <UploadPanel
+        courseworkType={courseworkType}
+        onCourseworkTypeChange={setCourseworkType}
         subject={subject}
         onSubjectChange={setSubject}
         level={level}

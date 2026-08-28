@@ -37,6 +37,38 @@
   color: var(--text);
 }
 
+.courseworkGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.courseworkTile {
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
+}
+
+.courseworkTile:hover {
+  border-color: var(--primary);
+  transform: translateY(-1px);
+}
+
+.courseworkTileActive {
+  background: rgba(76, 141, 255, 0.1);
+  border-color: var(--primary);
+  color: var(--primary);
+  font-weight: 600;
+}
+
 .subjectRow {
   display: flex;
   align-items: center;

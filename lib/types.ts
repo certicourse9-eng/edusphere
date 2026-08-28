@@ -1,5 +1,14 @@
 export type Level = 'SL' | 'HL';
 
+export type CourseworkType = 'internal-assessment' | 'extended-essay' | 'tok' | 'external-assessment';
+
+export const COURSEWORK_TYPE_LABELS: Record<CourseworkType, string> = {
+  'internal-assessment': 'Internal Assessment',
+  'extended-essay': 'Extended Essay',
+  tok: 'TOK essay/exhibition',
+  'external-assessment': 'External Assessment'
+};
+
 export type FileStatus = 'queued' | 'ocr' | 'processing' | 'done' | 'error';
 
 export interface CriterionScore {

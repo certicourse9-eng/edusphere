@@ -2,15 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { buildSubjectDetectionPrompt, buildTextGradingPrompt } from '@/lib/prompt';
 import { parseGradingResponse } from '@/lib/parseGradingResponse';
 import { SUBJECTS } from '@/lib/subjectIcons';
-import type { GradingResult } from '@/lib/types';
+import type { CourseworkType, GradingResult } from '@/lib/types';
 
 const GENERAL_SUBJECT = 'General / Other';
+const TOK_SUBJECT_LABEL = 'Theory of Knowledge';
 const DETECTABLE_SUBJECTS = SUBJECTS.filter(s => s !== GENERAL_SUBJECT);
+const COURSEWORK_TYPES: CourseworkType[] = ['internal-assessment', 'extended-essay', 'tok', 'external-assessment'];
 
 interface GradeRequestBody {
   ocrText?: string;
   subject?: string;
   level?: string;
+  courseworkType?: string;
 }
 
 interface GroqResponse {
@@ -86,10 +89,31 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const { ocrText, subject, level } = body;
+  const { ocrText, subject, level, courseworkType: rawCourseworkType } = body;
   if (!ocrText || typeof ocrText !== 'string') {
     return NextResponse.json({ error: 'Request body must include an "ocrText" string' }, { status: 400 });
   }
+  const courseworkType: CourseworkType = COURSEWORK_TYPES.includes(rawCourseworkType as CourseworkType)
+    ? (rawCourseworkType as CourseworkType)
+    : 'external-assessment';
+
+  // TOK has no subject concept at all - skip subject requirements/verification entirely.
+  if (courseworkType === 'tok') {
+    const gradingPrompt = buildTextGradingPrompt(courseworkType, TOK_SUBJECT_LABEL, level || '', ocrText);
+    let text: string;
+    try {
+      text = await callGroq(apiKey, model, gradingPrompt, true);
+    } catch (err) {
+      return NextResponse.json({ error: (err as Error).message }, { status: 502 });
+    }
+    try {
+      const result = parseGradingResponse(text, TOK_SUBJECT_LABEL);
+      return NextResponse.json(result, { status: 200 });
+    } catch (err) {
+      return NextResponse.json({ error: (err as Error).message }, { status: 502 });
+    }
+  }
+
   if (!subject || !level) {
     return NextResponse.json({ error: 'Request body must include "subject" and "level"' }, { status: 400 });
   }
@@ -121,7 +145,7 @@ export async function POST(req: NextRequest) {
   }
 
   const gradingSubject = selectedSubject;
-  const gradingPrompt = buildTextGradingPrompt(gradingSubject, level, ocrText);
+  const gradingPrompt = buildTextGradingPrompt(courseworkType, gradingSubject, level, ocrText);
 
   let text: string;
   try {

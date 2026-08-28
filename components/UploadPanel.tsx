@@ -4,9 +4,14 @@ import { useCallback, useRef, useState } from 'react';
 import styles from './UploadPanel.module.css';
 import SubjectIcon from './SubjectIcon';
 import { SUBJECTS } from '@/lib/subjectIcons';
-import type { Level } from '@/lib/types';
+import type { CourseworkType, Level } from '@/lib/types';
+import { COURSEWORK_TYPE_LABELS } from '@/lib/types';
+
+const COURSEWORK_TYPES: CourseworkType[] = ['internal-assessment', 'extended-essay', 'tok', 'external-assessment'];
 
 interface UploadPanelProps {
+  courseworkType: CourseworkType;
+  onCourseworkTypeChange: (t: CourseworkType) => void;
   subject: string;
   onSubjectChange: (s: string) => void;
   level: Level;
@@ -19,6 +24,8 @@ interface UploadPanelProps {
 }
 
 export default function UploadPanel({
+  courseworkType,
+  onCourseworkTypeChange,
   subject,
   onSubjectChange,
   level,
@@ -29,6 +36,8 @@ export default function UploadPanel({
   canRun,
   progressLabel
 }: UploadPanelProps) {
+  const showSubject = courseworkType !== 'tok';
+  const showLevel = courseworkType === 'internal-assessment' || courseworkType === 'external-assessment';
   const [dragActive, setDragActive] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -67,32 +76,64 @@ export default function UploadPanel({
 
   return (
     <section className={`${styles.panel} fade-in`}>
-      <div className={styles.controls}>
-        <div className={styles.field}>
-          <label htmlFor="subject">Subject</label>
-          <div className={styles.subjectRow}>
-            <SubjectIcon subject={subject} />
-            <select id="subject" value={subject} onChange={e => onSubjectChange(e.target.value)}>
-              {SUBJECTS.map(s => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className={styles.field}>
-          <label htmlFor="level">Level</label>
-          <select id="level" value={level} onChange={e => onLevelChange(e.target.value as Level)}>
-            <option value="SL">SL</option>
-            <option value="HL">HL</option>
-          </select>
+      <div className={styles.field}>
+        <label>Coursework type</label>
+        <div className={styles.courseworkGrid}>
+          {COURSEWORK_TYPES.map(t => (
+            <button
+              key={t}
+              type="button"
+              className={`${styles.courseworkTile} ${courseworkType === t ? styles.courseworkTileActive : ''}`}
+              onClick={() => onCourseworkTypeChange(t)}
+            >
+              {COURSEWORK_TYPE_LABELS[t]}
+            </button>
+          ))}
         </div>
       </div>
-      <p className={styles.autoSubjectNote}>
-        The uploaded sheet is checked against the subject you picked — if it looks like a different subject, it's flagged instead of graded.
-      </p>
+
+      <div className={styles.controls}>
+        {showSubject && (
+          <div className={styles.field}>
+            <label htmlFor="subject">Subject</label>
+            <div className={styles.subjectRow}>
+              <SubjectIcon subject={subject} />
+              <select id="subject" value={subject} onChange={e => onSubjectChange(e.target.value)}>
+                {SUBJECTS.map(s => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+
+        {showLevel && (
+          <div className={styles.field}>
+            <label htmlFor="level">Level</label>
+            <select id="level" value={level} onChange={e => onLevelChange(e.target.value as Level)}>
+              <option value="SL">SL</option>
+              <option value="HL">HL</option>
+            </select>
+          </div>
+        )}
+      </div>
+      {showSubject && courseworkType !== 'extended-essay' && (
+        <p className={styles.autoSubjectNote}>
+          The uploaded sheet is checked against the subject you picked — if it looks like a different subject, it's flagged instead of graded.
+        </p>
+      )}
+      {courseworkType === 'extended-essay' && (
+        <p className={styles.autoSubjectNote}>
+          Graded against the fixed Extended Essay criteria (Focus and method, Knowledge and understanding, Critical thinking, Presentation, Engagement) — the subject you pick is checked against the essay's actual content, same as other coursework types.
+        </p>
+      )}
+      {courseworkType === 'tok' && (
+        <p className={styles.autoSubjectNote}>
+          Graded against TOK-specific criteria — no subject needed.
+        </p>
+      )}
 
       <div
         className={`${styles.dropzone} ${dragActive ? styles.dropzoneActive : ''}`}

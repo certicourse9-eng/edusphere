@@ -1,4 +1,5 @@
-import { getSubjectCriteria } from './subjectObjectives';
+import { getCriteria } from './subjectObjectives';
+import type { CourseworkType } from './types';
 
 export function buildSubjectDetectionPrompt(ocrText: string, knownSubjects: string[]): string {
   return `The text below was extracted by OCR from a scanned IB student answer sheet. Based ONLY on the subject matter of the questions and answers, decide which ONE of these subjects it belongs to:
@@ -13,39 +14,85 @@ ${ocrText}
 """`;
 }
 
-export function buildTextGradingPrompt(subject: string, level: string, ocrText: string): string {
-  const criteria = getSubjectCriteria(subject);
-  const criteriaList = criteria
-    .map(c => `- ${c.code}: ${c.name} (out of ${c.maxScore}) — ${c.description}`)
-    .join('\n');
-  const questionMaxTotal = criteria.reduce((sum, c) => sum + c.maxScore, 0);
-  const criteriaCodesExample = criteria
+function criteriaBlock(criteria: ReturnType<typeof getCriteria>) {
+  const list = criteria.map(c => `- ${c.code}: ${c.name} (out of ${c.maxScore}) — ${c.description}`).join('\n');
+  const maxTotal = criteria.reduce((sum, c) => sum + c.maxScore, 0);
+  const example = criteria
     .map(c => `{"code":"${c.code}","name":"${c.name}","score":0,"maxScore":${c.maxScore},"comment":"..."}`)
     .join(',');
+  return { list, maxTotal, example };
+}
 
-  return `You are an IB examiner's grading assistant reviewing a scanned student answer sheet for ${subject} ${level}.
+const EMPTY_RESULT_JSON =
+  '{"questions":[],"generalFeedback":[],"totalScore":0,"maxTotal":0,"error":"Sheet appears blank or unreadable."}';
 
-The text below was extracted by a PaddleOCR pass over a scanned PDF of one student's handwritten or typed responses to an IB ${subject} ${level} assessment. It is plain text, not an image — you cannot assess handwriting quality, only the symbolic content. The OCR text may contain recognition errors, garbled symbols, or misplaced line breaks; use your best judgement to reconstruct the intended meaning.
+export function buildTextGradingPrompt(
+  courseworkType: CourseworkType,
+  subject: string,
+  level: string,
+  ocrText: string
+): string {
+  const criteria = getCriteria(courseworkType, subject);
+  const { list, maxTotal, example } = criteriaBlock(criteria);
 
-Grade using these ${subject} assessment criteria for EVERY question (do not substitute criteria from a different subject, and do not invent additional criteria):
+  if (courseworkType === 'extended-essay' || courseworkType === 'tok') {
+    const pieceLabel = courseworkType === 'extended-essay' ? 'IB Extended Essay' : 'IB TOK essay or exhibition commentary';
+    const subjectLine =
+      courseworkType === 'extended-essay' ? ` in ${subject}` : '';
 
-${criteriaList}
+    return `You are an IB examiner's grading assistant reviewing a scanned ${pieceLabel}${subjectLine}.
+
+The text below was extracted by a PaddleOCR pass over a scanned PDF of the student's full written piece. It is plain text, not an image — you cannot assess handwriting or layout, only the written content. The OCR text may contain recognition errors, garbled symbols, or misplaced line breaks; use your best judgement to reconstruct the intended meaning. This is ONE continuous piece of writing, not a set of separate question/answer pairs — do not split it into multiple questions.
+
+Grade the whole piece using these criteria (do not substitute criteria from a different coursework type, and do not invent additional criteria):
+
+${list}
+
+Do the following, in order:
+1. Identify the essay's research question, knowledge question, or central focus (whatever is most applicable), and write a 1-3 sentence summary of the piece's overall argument/content.
+2. Score the WHOLE piece against EACH of the ${criteria.length} criteria above individually (each out of its own maxScore shown above), with a short comment of 15 words or fewer per criterion explaining that score. Sum the criteria scores into an overall score, and the criteria maxScores into an overall maxScore (which will be ${maxTotal}, since the criteria above sum to that).
+3. Write one overall feedback comment (15 words or fewer) summarizing across all criteria.
+4. Write 2-4 general feedback bullets for the whole piece, each 16 words or fewer, grounded in the criteria above.
+
+Respond with ONLY a single JSON object, no markdown fences, no commentary, matching exactly this shape (the "questions" array will contain exactly ONE entry, representing the whole piece):
+
+{"questions":[{"number":1,"questionText":"<research question / knowledge question / central focus>","answerText":"<1-3 sentence summary of the piece>","score":0,"maxScore":${maxTotal},"feedback":"...","criteria":[${example}]}],"generalFeedback":["...","..."],"totalScore":0,"maxTotal":${maxTotal}}
+
+If the OCR text is empty or garbled beyond use, respond with exactly:
+
+${EMPTY_RESULT_JSON}
+
+OCR TEXT:
+"""
+${ocrText}
+"""`;
+  }
+
+  const courseworkLabel = courseworkType === 'internal-assessment' ? 'Internal Assessment' : 'external assessment';
+
+  return `You are an IB examiner's grading assistant reviewing a scanned student ${courseworkLabel} answer sheet for ${subject} ${level}.
+
+The text below was extracted by a PaddleOCR pass over a scanned PDF of one student's handwritten or typed responses to an IB ${subject} ${level} ${courseworkLabel}. It is plain text, not an image — you cannot assess handwriting quality, only the symbolic content. The OCR text may contain recognition errors, garbled symbols, or misplaced line breaks; use your best judgement to reconstruct the intended meaning.
+
+Grade using these ${subject} ${courseworkLabel} criteria for EVERY question (do not substitute criteria from a different subject or coursework type, and do not invent additional criteria):
+
+${list}
 
 Do the following, in order:
 1. Identify each distinct question/answer pair in the OCR text, in order.
 2. For each answer, write a 1-3 sentence summary of what the student wrote.
-3. For each question, score it against EACH of the ${criteria.length} criteria above individually (each out of its own maxScore shown above), with a short comment of 12 words or fewer per criterion explaining that specific score. Sum the criteria scores into the question's own score, and the criteria maxScores into the question's own maxScore (which will be ${questionMaxTotal} per question, since the criteria above sum to that).
+3. For each question, score it against EACH of the ${criteria.length} criteria above individually (each out of its own maxScore shown above), with a short comment of 12 words or fewer per criterion explaining that specific score. Sum the criteria scores into the question's own score, and the criteria maxScores into the question's own maxScore (which will be ${maxTotal} per question, since the criteria above sum to that).
 4. Write a single overall feedback comment for the question (12 words or fewer) summarizing across all criteria.
-5. Write 2-4 general feedback bullets for the whole sheet, each 14 words or fewer, grounded in the ${subject} criteria.
+5. Write 2-4 general feedback bullets for the whole sheet, each 14 words or fewer, grounded in the criteria above.
 6. Compute totalScore (the sum of every question's score) and maxTotal (the sum of every question's maxScore).
 
 Respond with ONLY a single JSON object, no markdown fences, no commentary, matching exactly this shape:
 
-{"questions":[{"number":1,"questionText":"...","answerText":"...","score":0,"maxScore":${questionMaxTotal},"feedback":"...","criteria":[${criteriaCodesExample}]}],"generalFeedback":["...","..."],"totalScore":0,"maxTotal":0}
+{"questions":[{"number":1,"questionText":"...","answerText":"...","score":0,"maxScore":${maxTotal},"feedback":"...","criteria":[${example}]}],"generalFeedback":["...","..."],"totalScore":0,"maxTotal":0}
 
 If the OCR text is empty, garbled beyond use, or you cannot identify any questions, respond with exactly:
 
-{"questions":[],"generalFeedback":[],"totalScore":0,"maxTotal":0,"error":"Sheet appears blank or unreadable."}
+${EMPTY_RESULT_JSON}
 
 OCR TEXT:
 """
