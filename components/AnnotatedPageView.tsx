@@ -19,10 +19,25 @@ interface HighlightBox {
   heightPct: number;
 }
 
-/** Assigns each line across all pages the same global index buildLineMarkedText
- *  used ([L0], [L1], ...), so annotation.lineStart/lineEnd can be resolved
- *  back to (page, line) without needing to re-run any matching. */
-function computePageHighlights(pages: OcrPage[], annotations: Annotation[]): HighlightBox[][] {
+interface ImageDims {
+  w: number;
+  h: number;
+}
+
+const TYPE_ICON: Record<Annotation['type'], string> = {
+  strength: '🌟',
+  weakness: '💥',
+  suggestion: '💡',
+  criterion: '🎯'
+};
+
+/** Assigns each line across all pages the same global index buildLineMarkedText used
+ *  ([L0], [L1], ...), so annotation.lineStart/lineEnd can be resolved back to (page, line)
+ *  without needing to re-run any matching. Highlight boxes are expressed as percentages of
+ *  each page's REAL rendered image dimensions (passed in once the <img> has loaded) - PaddleOCR
+ *  doesn't report page dimensions, so falling back to "furthest text extent seen" instead of the
+ *  real image size (an earlier version of this) drifts whenever text doesn't reach the margins. */
+function computePageHighlights(pages: OcrPage[], annotations: Annotation[], dims: Record<number, ImageDims>): HighlightBox[][] {
   const perPage: HighlightBox[][] = pages.map(() => []);
   let globalIndex = 0;
   const lineLocation: { pageIndex: number; lineIndex: number }[] = [];
@@ -49,7 +64,8 @@ function computePageHighlights(pages: OcrPage[], annotations: Annotation[]): Hig
 
     byPage.forEach((lineIndices, pageIndex) => {
       const page = pages[pageIndex];
-      if (!page) return;
+      const pageDims = dims[pageIndex];
+      if (!page || !pageDims) return;
       let minX = Infinity;
       let minY = Infinity;
       let maxX = -Infinity;
@@ -65,20 +81,14 @@ function computePageHighlights(pages: OcrPage[], annotations: Annotation[]): Hig
       });
       if (!Number.isFinite(minX)) return;
 
-      // Boxes need a natural image size to convert to percentages - derived
-      // from the max coordinate seen across every line on the page, padded
-      // slightly, since PaddleOCR doesn't report page dimensions directly.
-      const pageMaxX = Math.max(...page.lines.map(l => l.box[2]), maxX);
-      const pageMaxY = Math.max(...page.lines.map(l => l.box[3]), maxY);
-      const pad = 4;
-
+      const pad = 5;
       perPage[pageIndex].push({
         key: `${annotationIndex}-${pageIndex}`,
         annotation,
-        leftPct: (Math.max(0, minX - pad) / pageMaxX) * 100,
-        topPct: (Math.max(0, minY - pad) / pageMaxY) * 100,
-        widthPct: ((maxX - minX + pad * 2) / pageMaxX) * 100,
-        heightPct: ((maxY - minY + pad * 2) / pageMaxY) * 100
+        leftPct: (Math.max(0, minX - pad) / pageDims.w) * 100,
+        topPct: (Math.max(0, minY - pad) / pageDims.h) * 100,
+        widthPct: ((maxX - minX + pad * 2) / pageDims.w) * 100,
+        heightPct: ((maxY - minY + pad * 2) / pageDims.h) * 100
       });
     });
   });
@@ -87,8 +97,9 @@ function computePageHighlights(pages: OcrPage[], annotations: Annotation[]): Hig
 }
 
 export default function AnnotatedPageView({ pages, annotations }: AnnotatedPageViewProps) {
-  const [selected, setSelected] = useState<HighlightBox | null>(null);
-  const perPageHighlights = useMemo(() => computePageHighlights(pages, annotations), [pages, annotations]);
+  const [hoveredKey, setHoveredKey] = useState<string | null>(null);
+  const [dims, setDims] = useState<Record<number, ImageDims>>({});
+  const perPageHighlights = useMemo(() => computePageHighlights(pages, annotations, dims), [pages, annotations, dims]);
 
   if (pages.length === 0 || pages.every(p => !p.imageDataUrl)) {
     return <p className={styles.emptyNote}>No page images available to annotate for this sheet.</p>;
@@ -96,53 +107,78 @@ export default function AnnotatedPageView({ pages, annotations }: AnnotatedPageV
 
   return (
     <div className={styles.wrap}>
-      <p className={styles.hint}>Click a highlighted section to see the feedback tied to it.</p>
+      <p className={styles.hint}>
+        <span aria-hidden="true">✨</span> Hover a highlighted section to see the feedback tied to it &mdash; tap it on touch
+        devices.
+      </p>
       {pages.map((page, pageIndex) => {
         if (!page.imageDataUrl) return null;
         const highlights = perPageHighlights[pageIndex] || [];
         return (
           <div key={pageIndex} className={styles.pageBlock}>
             <div className={styles.pageImageWrap}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={page.imageDataUrl} alt={`Page ${pageIndex + 1}`} className={styles.pageImage} />
-              {highlights.map(h => (
-                <button
-                  key={h.key}
-                  type="button"
-                  className={`${styles.highlight} ${styles[h.annotation.type]}`}
-                  style={{ left: `${h.leftPct}%`, top: `${h.topPct}%`, width: `${h.widthPct}%`, height: `${h.heightPct}%` }}
-                  onClick={() => setSelected(selected?.key === h.key ? null : h)}
-                  aria-label={`${ANNOTATION_TYPE_LABELS[h.annotation.type]}: ${h.annotation.comment}`}
+              <div className={styles.pageImageClip}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={page.imageDataUrl}
+                  alt={`Page ${pageIndex + 1}`}
+                  className={styles.pageImage}
+                  onLoad={e => {
+                    const img = e.currentTarget;
+                    setDims(prev => ({ ...prev, [pageIndex]: { w: img.naturalWidth, h: img.naturalHeight } }));
+                  }}
                 />
-              ))}
+              </div>
+              {highlights.map((h, i) => {
+                const isHovered = hoveredKey === h.key;
+                const flipDown = h.topPct < 22;
+                return (
+                  <button
+                    key={h.key}
+                    type="button"
+                    className={`${styles.highlight} ${styles[h.annotation.type]} ${isHovered ? styles.highlightActive : ''}`}
+                    style={{
+                      left: `${h.leftPct}%`,
+                      top: `${h.topPct}%`,
+                      width: `${h.widthPct}%`,
+                      height: `${h.heightPct}%`,
+                      ['--wobble' as string]: i % 2 === 0 ? '-0.6deg' : '0.6deg',
+                      ['--sparkleDelay' as string]: `${(i % 5) * 0.35}s`
+                    }}
+                    onMouseEnter={() => setHoveredKey(h.key)}
+                    onMouseLeave={() => setHoveredKey(prev => (prev === h.key ? null : prev))}
+                    onFocus={() => setHoveredKey(h.key)}
+                    onBlur={() => setHoveredKey(prev => (prev === h.key ? null : prev))}
+                    onClick={() => setHoveredKey(prev => (prev === h.key ? null : h.key))}
+                    aria-label={`${ANNOTATION_TYPE_LABELS[h.annotation.type]}: ${h.annotation.comment}`}
+                  >
+                    <span className={styles.sparkle} aria-hidden="true">
+                      ✨
+                    </span>
+                    {isHovered && (
+                      <div className={`${styles.tooltip} ${flipDown ? styles.tooltipDown : styles.tooltipUp}`}>
+                        <span className={`${styles.tooltipBadge} ${styles[h.annotation.type]}`}>
+                          <span aria-hidden="true">{TYPE_ICON[h.annotation.type]}</span>
+                          {ANNOTATION_TYPE_LABELS[h.annotation.type]}
+                          {h.annotation.criterionCode ? ` · ${h.annotation.criterionCode}` : ''}
+                        </span>
+                        <p className={styles.tooltipComment}>{h.annotation.comment}</p>
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
             </div>
             <span className={styles.pageLabel}>Page {pageIndex + 1}</span>
           </div>
         );
       })}
 
-      {selected && (
-        <div className={styles.popupOverlay} onClick={() => setSelected(null)}>
-          <div className={styles.popup} onClick={e => e.stopPropagation()}>
-            <div className={styles.popupHead}>
-              <span className={`${styles.popupBadge} ${styles[selected.annotation.type]}`}>
-                {ANNOTATION_TYPE_LABELS[selected.annotation.type]}
-                {selected.annotation.criterionCode ? ` · ${selected.annotation.criterionCode}` : ''}
-              </span>
-              <button type="button" className={styles.popupClose} onClick={() => setSelected(null)} aria-label="Close">
-                ×
-              </button>
-            </div>
-            <p className={styles.popupComment}>{selected.annotation.comment}</p>
-          </div>
-        </div>
-      )}
-
       <div className={styles.legend}>
         {(['strength', 'weakness', 'suggestion', 'criterion'] as const).map(type => (
           <span key={type} className={styles.legendItem}>
             <span className={`${styles.legendSwatch} ${styles[type]}`} />
-            {ANNOTATION_TYPE_LABELS[type]}
+            {TYPE_ICON[type]} {ANNOTATION_TYPE_LABELS[type]}
           </span>
         ))}
       </div>
