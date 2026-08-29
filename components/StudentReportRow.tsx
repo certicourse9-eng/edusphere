@@ -6,8 +6,9 @@ import AnnotatedPageView from './AnnotatedPageView';
 import ScoreRing from './ScoreRing';
 import SubjectIcon from './SubjectIcon';
 import TeacherFeedbackBox from './TeacherFeedbackBox';
+import WhyThisMarkPanel from './WhyThisMarkPanel';
 import { getBand, BAND_LABELS, BAND_COLORS, approxIbGrade } from '@/lib/gradeBands';
-import type { StudentFile } from '@/lib/types';
+import type { GradedQuestion, StudentFile } from '@/lib/types';
 
 interface StudentReportRowProps {
   file: StudentFile;
@@ -17,6 +18,7 @@ interface StudentReportRowProps {
 export default function StudentReportRow({ file, onTeacherFeedbackChange }: StudentReportRowProps) {
   const [tab, setTab] = useState<'overview' | 'questions' | 'annotated' | 'pdf' | 'ocr'>('overview');
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [whyMarkQuestion, setWhyMarkQuestion] = useState<GradedQuestion | null>(null);
 
   useEffect(() => {
     const url = URL.createObjectURL(file.file);
@@ -114,9 +116,14 @@ export default function StudentReportRow({ file, onTeacherFeedbackChange }: Stud
                 <p className={styles.answerText}>{q.answerText}</p>
                 <p className={styles.feedback}>
                   <span>{q.feedback}</span>
-                  <span className={styles.scoreTag}>
-                    {q.score}/{q.maxScore}
-                  </span>
+                  <button
+                    type="button"
+                    className={styles.scoreTag}
+                    onClick={() => setWhyMarkQuestion(q)}
+                    title="Why this mark?"
+                  >
+                    {q.score}/{q.maxScore} <span aria-hidden="true">ⓘ</span>
+                  </button>
                 </p>
                 {q.criteria.length > 0 && (
                   <div className={styles.criteriaList}>
@@ -161,6 +168,8 @@ export default function StudentReportRow({ file, onTeacherFeedbackChange }: Stud
           <pre className={styles.ocrText}>{file.ocrText}</pre>
         </div>
       )}
+
+      <WhyThisMarkPanel question={whyMarkQuestion} onClose={() => setWhyMarkQuestion(null)} />
     </div>
   );
 }

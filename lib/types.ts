@@ -49,6 +49,12 @@ export interface CriterionScore {
   score: number;
   maxScore: number;
   comment: string;
+  /** What in the student's answer earned the awarded marks for this criterion - cited from
+   *  their actual answer, not invented. Empty string if the model didn't identify anything. */
+  evidence: string;
+  /** What's missing, wrong, or incomplete for this criterion. Empty string if full marks
+   *  were awarded and nothing is missing. */
+  missing: string;
 }
 
 export interface GradedQuestion {
@@ -59,6 +65,9 @@ export interface GradedQuestion {
   maxScore: number;
   feedback: string;
   criteria: CriterionScore[];
+  /** The model's own confidence (0-1) in its grading of this question, accounting for OCR
+   *  clarity and answer ambiguity. Null when the model didn't report one - never fabricated. */
+  confidence: number | null;
 }
 
 export type AnnotationType = 'strength' | 'weakness' | 'suggestion' | 'criterion';

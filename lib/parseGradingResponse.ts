@@ -29,8 +29,15 @@ function normalizeCriteria(raw: unknown): CriterionScore[] {
       name: typeof c.name === 'string' ? c.name : '',
       score: typeof c.score === 'number' ? c.score : 0,
       maxScore: typeof c.maxScore === 'number' ? c.maxScore : 0,
-      comment: typeof c.comment === 'string' ? c.comment : ''
+      comment: typeof c.comment === 'string' ? c.comment : '',
+      evidence: typeof c.evidence === 'string' ? c.evidence : '',
+      missing: typeof c.missing === 'string' ? c.missing : ''
     }));
+}
+
+function normalizeConfidence(raw: unknown): number | null {
+  if (typeof raw !== 'number' || Number.isNaN(raw)) return null;
+  return Math.max(0, Math.min(1, raw));
 }
 
 function normalizeQuestions(raw: unknown): GradedQuestion[] {
@@ -44,7 +51,8 @@ function normalizeQuestions(raw: unknown): GradedQuestion[] {
       score: typeof q.score === 'number' ? q.score : 0,
       maxScore: typeof q.maxScore === 'number' ? q.maxScore : 0,
       feedback: typeof q.feedback === 'string' ? q.feedback : '',
-      criteria: normalizeCriteria(q.criteria)
+      criteria: normalizeCriteria(q.criteria),
+      confidence: normalizeConfidence(q.confidence)
     }));
 }
 

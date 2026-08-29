@@ -199,6 +199,18 @@
   font-family: var(--font-mono), monospace;
   color: var(--text-soft);
   white-space: nowrap;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 3px 10px;
+  cursor: pointer;
+  font-size: 12.5px;
+  transition: border-color 150ms ease, color 150ms ease;
+}
+
+.scoreTag:hover {
+  border-color: var(--primary);
+  color: var(--primary);
 }
 
 .criteriaList {

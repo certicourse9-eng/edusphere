@@ -1,0 +1,195 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(23, 27, 46, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 80;
+  padding: 20px;
+}
+
+.panel {
+  background: var(--panel);
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(23, 27, 46, 0.3);
+  padding: 22px;
+  max-width: 440px;
+  width: 100%;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--primary);
+}
+
+.title {
+  margin: 2px 0 0;
+  font-family: var(--font-sora), sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.closeBtn {
+  border: none;
+  background: none;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--text-soft);
+  cursor: pointer;
+  padding: 2px 6px;
+  flex-shrink: 0;
+}
+
+.closeBtn:hover {
+  color: var(--coral);
+}
+
+.awardedRow {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.awardedValue {
+  font-family: var(--font-sora), sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.awardedLabel {
+  font-size: 12.5px;
+  color: var(--text-soft);
+}
+
+.confidenceBadge {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+
+.confidenceBadge.good {
+  background: rgba(47, 191, 113, 0.14);
+  color: var(--green);
+}
+
+.confidenceBadge.moderate {
+  background: rgba(245, 166, 35, 0.14);
+  color: var(--amber);
+}
+
+.confidenceBadge.weak {
+  background: rgba(255, 107, 107, 0.14);
+  color: var(--coral);
+}
+
+.lowConfidenceNote {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--coral);
+  background: rgba(255, 107, 107, 0.08);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.overallFeedback {
+  margin: 0 0 16px;
+  font-size: 13.5px;
+  color: var(--text);
+  line-height: 1.5;
+  padding-bottom: 14px;
+  border-bottom: 1px dashed var(--line);
+}
+
+.emptyNote {
+  font-size: 12.5px;
+  color: var(--text-soft);
+}
+
+.criteriaList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.criterionCard {
+  background: var(--bg);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.criterionHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.criterionScore {
+  font-family: var(--font-mono), monospace;
+  color: var(--text-soft);
+  white-space: nowrap;
+}
+
+.evidenceRow {
+  margin: 0 0 6px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.evidenceRow:last-child {
+  margin-bottom: 0;
+}
+
+.rowLabel {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-soft);
+  margin-right: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--line);
+}
+
+.evidenceLabel {
+  color: var(--green);
+  background: rgba(47, 191, 113, 0.14);
+}
+
+.missingLabel {
+  color: var(--coral);
+  background: rgba(255, 107, 107, 0.14);
+}
+
+.footerNote {
+  margin: 16px 0 0;
+  font-size: 11px;
+  color: var(--text-soft);
+  text-align: center;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}

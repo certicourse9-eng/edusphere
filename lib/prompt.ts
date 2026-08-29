@@ -18,10 +18,18 @@ function criteriaBlock(criteria: ReturnType<typeof getCriteria>) {
   const list = criteria.map(c => `- ${c.code}: ${c.name} (out of ${c.maxScore}) — ${c.description}`).join('\n');
   const maxTotal = criteria.reduce((sum, c) => sum + c.maxScore, 0);
   const example = criteria
-    .map(c => `{"code":"${c.code}","name":"${c.name}","score":0,"maxScore":${c.maxScore},"comment":"..."}`)
+    .map(
+      c =>
+        `{"code":"${c.code}","name":"${c.name}","score":0,"maxScore":${c.maxScore},"comment":"...","evidence":"...","missing":"..."}`
+    )
     .join(',');
   return { list, maxTotal, example };
 }
+
+const EVIDENCE_INSTRUCTION = `For EACH criterion, in addition to the score and comment, also give:
+- "evidence": what in the student's actual answer earned those marks - cite or closely paraphrase specific words/working from their answer (20 words or fewer). Use "" only if zero marks were awarded and there's nothing to cite.
+- "missing": what's missing, wrong, or incomplete for that criterion, specific enough that a teacher could point to it (20 words or fewer). Use "" only if full marks were awarded and nothing is missing.
+Both must be grounded in the actual OCR text below - never invent an answer the student didn't give.`;
 
 const EMPTY_RESULT_JSON =
   '{"questions":[],"generalFeedback":[],"totalScore":0,"maxTotal":0,"annotations":[],"error":"Sheet appears blank or unreadable."}';
@@ -61,13 +69,15 @@ ${list}
 Do the following, in order:
 1. Identify the essay's research question, knowledge question, or central focus (whatever is most applicable), and write a 1-3 sentence summary of the piece's overall argument/content.
 2. Score the WHOLE piece against EACH of the ${criteria.length} criteria above individually (each out of its own maxScore shown above), with a short comment of 15 words or fewer per criterion explaining that score. Sum the criteria scores into an overall score, and the criteria maxScores into an overall maxScore (which will be ${maxTotal}, since the criteria above sum to that).
-3. Write one overall feedback comment (15 words or fewer) summarizing across all criteria.
-4. Write 2-4 general feedback bullets for the whole piece, each 16 words or fewer, grounded in the criteria above.
-5. ${ANNOTATIONS_INSTRUCTION}
+3. ${EVIDENCE_INSTRUCTION}
+4. Write one overall feedback comment (15 words or fewer) summarizing across all criteria.
+5. Write 2-4 general feedback bullets for the whole piece, each 16 words or fewer, grounded in the criteria above.
+6. Give a "confidence" from 0 to 1 (e.g. 0.9) for how confident you are in this grading - lower it when the OCR text looks garbled, ambiguous, or borderline between two scores.
+7. ${ANNOTATIONS_INSTRUCTION}
 
 Respond with ONLY a single JSON object, no markdown fences, no commentary, matching exactly this shape (the "questions" array will contain exactly ONE entry, representing the whole piece):
 
-{"questions":[{"number":1,"questionText":"<research question / knowledge question / central focus>","answerText":"<1-3 sentence summary of the piece>","score":0,"maxScore":${maxTotal},"feedback":"...","criteria":[${example}]}],"generalFeedback":["...","..."],"totalScore":0,"maxTotal":${maxTotal},${ANNOTATIONS_EXAMPLE}}
+{"questions":[{"number":1,"questionText":"<research question / knowledge question / central focus>","answerText":"<1-3 sentence summary of the piece>","score":0,"maxScore":${maxTotal},"feedback":"...","criteria":[${example}],"confidence":0.9}],"generalFeedback":["...","..."],"totalScore":0,"maxTotal":${maxTotal},${ANNOTATIONS_EXAMPLE}}
 
 If the OCR text is empty or garbled beyond use, respond with exactly:
 
@@ -94,14 +104,16 @@ Do the following, in order:
 1. Identify each distinct question/answer pair in the OCR text, in order.
 2. For each answer, write a 1-3 sentence summary of what the student wrote.
 3. For each question, score it against EACH of the ${criteria.length} criteria above individually (each out of its own maxScore shown above), with a short comment of 12 words or fewer per criterion explaining that specific score. Sum the criteria scores into the question's own score, and the criteria maxScores into the question's own maxScore (which will be ${maxTotal} per question, since the criteria above sum to that).
-4. Write a single overall feedback comment for the question (12 words or fewer) summarizing across all criteria.
-5. Write 2-4 general feedback bullets for the whole sheet, each 14 words or fewer, grounded in the criteria above.
-6. Compute totalScore (the sum of every question's score) and maxTotal (the sum of every question's maxScore).
-7. ${ANNOTATIONS_INSTRUCTION}
+4. ${EVIDENCE_INSTRUCTION}
+5. Write a single overall feedback comment for the question (12 words or fewer) summarizing across all criteria.
+6. Write 2-4 general feedback bullets for the whole sheet, each 14 words or fewer, grounded in the criteria above.
+7. Compute totalScore (the sum of every question's score) and maxTotal (the sum of every question's maxScore).
+8. For EACH question, give a "confidence" from 0 to 1 (e.g. 0.9) for how confident you are in that question's grading - lower it when the OCR text for that answer looks garbled, ambiguous, or borderline between two scores.
+9. ${ANNOTATIONS_INSTRUCTION}
 
 Respond with ONLY a single JSON object, no markdown fences, no commentary, matching exactly this shape:
 
-{"questions":[{"number":1,"questionText":"...","answerText":"...","score":0,"maxScore":${maxTotal},"feedback":"...","criteria":[${example}]}],"generalFeedback":["...","..."],"totalScore":0,"maxTotal":0,${ANNOTATIONS_EXAMPLE}}
+{"questions":[{"number":1,"questionText":"...","answerText":"...","score":0,"maxScore":${maxTotal},"feedback":"...","criteria":[${example}],"confidence":0.9}],"generalFeedback":["...","..."],"totalScore":0,"maxTotal":0,${ANNOTATIONS_EXAMPLE}}
 
 If the OCR text is empty, garbled beyond use, or you cannot identify any questions, respond with exactly:
 
