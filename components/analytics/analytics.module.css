@@ -1,0 +1,227 @@
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sectionHead h2 {
+  font-size: 19px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.sectionSub {
+  color: var(--text-soft);
+  font-size: 13.5px;
+  margin: 0;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 16px;
+}
+
+.span4 {
+  grid-column: span 4;
+}
+
+.span6 {
+  grid-column: span 6;
+}
+
+.span8 {
+  grid-column: span 8;
+}
+
+.span12 {
+  grid-column: span 12;
+}
+
+@media (max-width: 900px) {
+  .span4,
+  .span6,
+  .span8,
+  .span12 {
+    grid-column: span 12;
+  }
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.cardHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.cardTitle {
+  font-family: var(--font-sora), sans-serif;
+  font-size: 14.5px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.cardSub {
+  font-size: 11.5px;
+  color: var(--text-soft);
+  margin: 2px 0 0;
+}
+
+.chartBody {
+  position: relative;
+}
+
+.emptyNote {
+  font-size: 12.5px;
+  color: var(--text-soft);
+  text-align: center;
+  padding: 24px 8px;
+}
+
+/* Legend - the dependable identity channel, always present for >=2 series. */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 11.5px;
+  color: var(--text-secondary, var(--text));
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legendSwatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.legendLine {
+  display: inline-block;
+  width: 14px;
+  height: 2px;
+  border-radius: 1px;
+  flex-shrink: 0;
+}
+
+/* Shared hover tooltip - value leads (strong/primary ink), label follows (secondary). */
+.tooltip {
+  position: absolute;
+  pointer-events: none;
+  z-index: 20;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 8px 22px rgba(23, 27, 46, 0.16);
+  padding: 7px 10px;
+  font-size: 11.5px;
+  white-space: nowrap;
+  transform: translate(-50%, calc(-100% - 10px));
+  animation: tooltipFade 100ms ease-out both;
+}
+
+@keyframes tooltipFade {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-100% - 4px));
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, calc(-100% - 10px));
+  }
+}
+
+.tooltipValue {
+  font-weight: 700;
+  color: var(--text);
+  font-size: 12.5px;
+}
+
+.tooltipLabel {
+  color: var(--text-soft);
+  margin-top: 1px;
+}
+
+.tooltipRow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.tooltipKey {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* Axis / gridline chrome - recessive, one step off the surface. */
+.axisText {
+  fill: var(--text-soft);
+  font-size: 10px;
+  font-family: var(--font-inter), sans-serif;
+}
+
+.gridline {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.tableToggle {
+  align-self: flex-start;
+  border: none;
+  background: none;
+  color: var(--primary);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.tableToggle:hover {
+  text-decoration: underline;
+}
+
+.dataTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.dataTable th,
+.dataTable td {
+  text-align: left;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.dataTable th {
+  color: var(--text-soft);
+  font-weight: 600;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dataTable td {
+  font-variant-numeric: tabular-nums;
+}

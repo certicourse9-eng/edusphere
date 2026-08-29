@@ -1,0 +1,67 @@
+.scrollWrap {
+  position: relative;
+  overflow: auto;
+  max-height: 420px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.heatTable {
+  border-collapse: separate;
+  border-spacing: 2px;
+  font-size: 11px;
+}
+
+.cornerCell {
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 3;
+  background: var(--panel);
+}
+
+.colHead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--panel);
+  color: var(--text-soft);
+  font-weight: 600;
+  font-size: 10.5px;
+  padding: 6px 8px;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--line);
+}
+
+.rowHead {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--panel);
+  color: var(--text);
+  font-weight: 600;
+  font-size: 10.5px;
+  font-family: var(--font-mono), monospace;
+  text-align: left;
+  padding: 4px 10px;
+  white-space: nowrap;
+  border-right: 1px solid var(--line);
+}
+
+.cell {
+  width: 34px;
+  height: 26px;
+  min-width: 34px;
+  border-radius: 4px;
+  text-align: center;
+  cursor: pointer;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  transition: filter 120ms ease;
+}
+
+.cell:hover {
+  filter: brightness(1.08);
+  outline: 2px solid var(--panel);
+  outline-offset: -2px;
+}

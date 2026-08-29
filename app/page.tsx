@@ -6,6 +6,7 @@ import FileQueue from '@/components/FileQueue';
 import ClassProgressBar from '@/components/ClassProgressBar';
 import Dashboard from '@/components/Dashboard';
 import HeroBlobs from '@/components/HeroBlobs';
+import AnalyticsSection from '@/components/analytics/AnalyticsSection';
 import { gradeFile } from '@/lib/gradeClient';
 import { deriveStudentId } from '@/lib/studentId';
 import { buildCsv, downloadCsv } from '@/lib/csv';
@@ -173,6 +174,8 @@ export default function Page() {
           failed={failedCount}
         />
       )}
+
+      <AnalyticsSection files={files} evaluatedCount={evaluatedCount} expectedStudentCount={expected} />
 
       <FileQueue files={files} onRemove={removeFile} />
       <Dashboard
