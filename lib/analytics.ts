@@ -141,3 +141,66 @@ export function getHeatmapData(files: StudentFile[]): HeatmapData {
 
   return { studentIds, questionNumbers, cells };
 }
+
+export interface Insight {
+  label: string;
+  detail: string;
+  tone: 'good' | 'weak' | 'neutral';
+}
+
+/** A handful of auto-generated, plainly-computed insights (weakest/strongest question,
+ *  weakest criterion, papers needing review) - every one is a direct read of the same
+ *  aggregates the charts plot, never a separate/invented judgement. */
+export function getInsights(files: StudentFile[]): Insight[] {
+  const insights: Insight[] = [];
+  if (gradedFiles(files).length === 0) return insights;
+
+  const questions = getQuestionAverages(files);
+  if (questions.length > 0) {
+    const byWeakest = [...questions].sort((a, b) => a.avgPct - b.avgPct);
+    const weakest = byWeakest[0];
+    const strongest = byWeakest[byWeakest.length - 1];
+    insights.push({
+      label: `Question ${weakest.number} is the class's weakest spot`,
+      detail: `${Math.round(weakest.avgPct * 100)}% average across ${weakest.studentCount} student${weakest.studentCount === 1 ? '' : 's'} - worth revisiting in class.`,
+      tone: 'weak'
+    });
+    if (strongest.number !== weakest.number) {
+      insights.push({
+        label: `Question ${strongest.number} is the strongest`,
+        detail: `${Math.round(strongest.avgPct * 100)}% average - the class has this one down.`,
+        tone: 'good'
+      });
+    }
+  }
+
+  const criteria = getCriteriaAverages(files);
+  if (criteria.length > 0) {
+    const weakest = [...criteria].sort((a, b) => a.avgPct - b.avgPct)[0];
+    insights.push({
+      label: `${weakest.code} · ${weakest.name} needs the most attention`,
+      detail: `${Math.round(weakest.avgPct * 100)}% average across every question that used it.`,
+      tone: 'weak'
+    });
+  }
+
+  const needsReview = files.filter(f => f.status === 'needs-review').length;
+  if (needsReview > 0) {
+    insights.push({
+      label: `${needsReview} paper${needsReview === 1 ? '' : 's'} flagged for review`,
+      detail: 'Low OCR confidence or a subject mismatch - check before trusting the score.',
+      tone: 'weak'
+    });
+  }
+
+  const failed = files.filter(f => f.status === 'failed').length;
+  if (failed > 0) {
+    insights.push({
+      label: `${failed} paper${failed === 1 ? '' : 's'} failed to grade`,
+      detail: 'Retry from the Queue below, or check the error message for why.',
+      tone: 'weak'
+    });
+  }
+
+  return insights;
+}

@@ -31,11 +31,6 @@ export default function AnalyticsSection({ files, evaluatedCount, expectedStuden
 
   return (
     <section className={`${styles.section} fade-in`}>
-      <div className={styles.sectionHead}>
-        <h2>Class analytics</h2>
-        <p className={styles.sectionSub}>Visual breakdown of this class&apos;s grading, updated as papers are evaluated.</p>
-      </div>
-
       <div className={styles.grid}>
         <div className={styles.span4}>
           <ProgressRing evaluated={evaluatedCount} total={progressTotal} />
