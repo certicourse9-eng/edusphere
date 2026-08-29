@@ -33,7 +33,14 @@ async function callGroq(apiKey: string, model: string, prompt: string, jsonMode:
       body: JSON.stringify({
         model,
         messages: [{ role: 'user', content: prompt }],
-        ...(jsonMode ? { response_format: { type: 'json_object' } } : {})
+        // Grading responses grew a lot once per-criterion evidence/missing text and a
+        // per-question confidence were added - without an explicit max_tokens, a long
+        // paper (many questions x criteria) could get cut off mid-JSON, which Groq's
+        // json_object validator rejects with "Failed to generate JSON". This account's
+        // tier caps prompt+completion at 8000 tokens total per request, so this has to
+        // leave real headroom for the prompt (criteria list + full OCR text) rather than
+        // claiming the whole budget for the completion alone.
+        ...(jsonMode ? { response_format: { type: 'json_object' }, max_tokens: 4000 } : {})
       })
     });
   } catch (err) {
@@ -48,7 +55,13 @@ async function callGroq(apiKey: string, model: string, prompt: string, jsonMode:
   }
 
   if (!resp.ok) {
-    throw new Error(data.error?.message || `Groq API error (status ${resp.status})`);
+    const rawMessage = data.error?.message || `Groq API error (status ${resp.status})`;
+    if (/request too large/i.test(rawMessage)) {
+      throw new Error(
+        'This paper is too long/text-heavy to grade in one request under the current API plan\'s per-request token limit. Try splitting it into smaller uploads, or upgrade the Groq plan.'
+      );
+    }
+    throw new Error(rawMessage);
   }
 
   const text = data.choices?.[0]?.message?.content;
@@ -56,6 +69,20 @@ async function callGroq(apiKey: string, model: string, prompt: string, jsonMode:
     throw new Error('Groq API response had no text content');
   }
   return text;
+}
+
+/** Groq's json_object mode occasionally rejects a model's own output as invalid JSON
+ *  ("Failed to generate JSON. Please adjust...") - this is non-deterministic (the same
+ *  prompt often succeeds on a second try), so retry once before surfacing it as a real
+ *  failure to the teacher. */
+async function callGroqJsonWithRetry(apiKey: string, model: string, prompt: string): Promise<string> {
+  try {
+    return await callGroq(apiKey, model, prompt, true);
+  } catch (err) {
+    const message = (err as Error).message;
+    if (!/failed to generate json/i.test(message)) throw err;
+    return callGroq(apiKey, model, prompt, true);
+  }
 }
 
 function normalizeDetectedSubject(raw: string): string {
@@ -103,7 +130,7 @@ export async function POST(req: NextRequest) {
     const gradingPrompt = buildTextGradingPrompt(courseworkType, TOK_SUBJECT_LABEL, level || '', ocrText);
     let text: string;
     try {
-      text = await callGroq(apiKey, model, gradingPrompt, true);
+      text = await callGroqJsonWithRetry(apiKey, model, gradingPrompt);
     } catch (err) {
       return NextResponse.json({ error: (err as Error).message }, { status: 502 });
     }
@@ -150,7 +177,7 @@ export async function POST(req: NextRequest) {
 
   let text: string;
   try {
-    text = await callGroq(apiKey, model, gradingPrompt, true);
+    text = await callGroqJsonWithRetry(apiKey, model, gradingPrompt);
   } catch (err) {
     return NextResponse.json({ error: (err as Error).message }, { status: 502 });
   }

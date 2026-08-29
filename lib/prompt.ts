@@ -27,9 +27,9 @@ function criteriaBlock(criteria: ReturnType<typeof getCriteria>) {
 }
 
 const EVIDENCE_INSTRUCTION = `For EACH criterion, in addition to the score and comment, also give:
-- "evidence": what in the student's actual answer earned those marks - cite or closely paraphrase specific words/working from their answer (20 words or fewer). Use "" only if zero marks were awarded and there's nothing to cite.
+- "evidence": what in the student's actual answer earned those marks (20 words or fewer). Use "" only if zero marks were awarded and there's nothing to cite.
 - "missing": what's missing, wrong, or incomplete for that criterion, specific enough that a teacher could point to it (20 words or fewer). Use "" only if full marks were awarded and nothing is missing.
-Both must be grounded in the actual OCR text below - never invent an answer the student didn't give.`;
+Both must be grounded in the actual OCR text below - never invent an answer the student didn't give. IMPORTANT for valid JSON: describe/paraphrase in your own plain words rather than copying the student's text verbatim, and never include a quotation mark (" or ') inside these strings.`;
 
 const EMPTY_RESULT_JSON =
   '{"questions":[],"generalFeedback":[],"totalScore":0,"maxTotal":0,"annotations":[],"error":"Sheet appears blank or unreadable."}';
