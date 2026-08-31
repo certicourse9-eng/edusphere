@@ -7,6 +7,7 @@ import Dashboard from '@/components/Dashboard';
 import HeroBlobs from '@/components/HeroBlobs';
 import AnalyticsPreviewCard from '@/components/analytics/AnalyticsPreviewCard';
 import GradeBoundariesPanel from '@/components/GradeBoundariesPanel';
+import ApiStatusPanel from '@/components/ApiStatusPanel';
 import { useClassSession } from '@/lib/ClassSessionContext';
 
 export default function Page() {
@@ -83,6 +84,7 @@ export default function Page() {
       />
 
       <GradeBoundariesPanel programme={programme} boundaries={gradeBoundaries} onChange={setGradeBoundaries} />
+      <ApiStatusPanel />
 
       {total > 0 && (
         <ClassProgressBar

@@ -4,8 +4,28 @@ import { createContext, useCallback, useContext, useState } from 'react';
 import { gradeFile } from './gradeClient';
 import { deriveStudentId } from './studentId';
 import { buildCsv, downloadCsv } from './csv';
+import { runWithConcurrency } from './concurrency';
 import type { StudentFile, Level, CourseworkType, IBProgramme, FileStatus, GradeBoundary } from './types';
 import { FINISHED_STATUSES } from './types';
+
+const MAX_CONCURRENCY = 5;
+
+/** How many AI accounts currently look usable, so a bulk run doesn't parallelize more than
+ *  the pool can actually support - with only one account configured, this keeps grading
+ *  sequential (parallel requests would just fight over the same rate limit); with several
+ *  healthy accounts, it fans work out across them. Falls back to 1 (sequential) if the
+ *  status check itself fails, rather than guessing. */
+async function getSafeConcurrency(): Promise<number> {
+  try {
+    const resp = await fetch('/api/ai-status');
+    if (!resp.ok) return 1;
+    const data = (await resp.json()) as { accounts?: { health?: { status?: string } }[] };
+    const healthy = (data.accounts ?? []).filter(a => a.health?.status !== 'disabled').length;
+    return Math.max(1, Math.min(healthy || 1, MAX_CONCURRENCY));
+  } catch {
+    return 1;
+  }
+}
 
 let idCounter = 0;
 function makeId(): string {
@@ -112,8 +132,9 @@ export function ClassSessionProvider({ children }: { children: React.ReactNode }
     const runSubject = subject;
     const runLevel = level;
     const toRun = files.filter(f => f.status === 'uploaded' || f.status === 'failed');
+    const concurrency = await getSafeConcurrency();
 
-    for (const entry of toRun) {
+    await runWithConcurrency(toRun, concurrency, async entry => {
       setFiles(prev => prev.map(f => (f.id === entry.id ? { ...f, error: null, reviewReason: undefined } : f)));
       try {
         const { result, ocrText, ocrPages, ocrConfidence } = await gradeFile(
@@ -156,7 +177,7 @@ export function ClassSessionProvider({ children }: { children: React.ReactNode }
           prev.map(f => (f.id === entry.id ? { ...f, status: 'failed' as FileStatus, error: (err as Error).message } : f))
         );
       }
-    }
+    });
 
     setRunning(false);
   }, [files, running, programme, courseworkType, subject, level, setStatus]);

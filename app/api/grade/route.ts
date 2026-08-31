@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { buildSubjectDetectionPrompt, buildTextGradingPrompt } from '@/lib/prompt';
 import { parseGradingResponse } from '@/lib/parseGradingResponse';
 import { SUBJECTS } from '@/lib/subjectIcons';
+import { callWithFailover } from '@/lib/ai/pool';
 import type { CourseworkType, GradingResult, IBProgramme } from '@/lib/types';
 
 const GENERAL_SUBJECT = 'General / Other';
@@ -16,126 +17,6 @@ interface GradeRequestBody {
   level?: string;
   courseworkType?: string;
   programme?: string;
-}
-
-interface GroqResponse {
-  choices?: { message?: { content?: string } }[];
-  error?: { message?: string; type?: string };
-}
-
-/** Marks an error as a rate limit specifically, carrying how long Groq says to wait
- *  (seconds), so callers can decide whether a short automatic retry is worth it. */
-class RateLimitError extends Error {
-  retryAfterSeconds: number | null;
-  constructor(message: string, retryAfterSeconds: number | null) {
-    super(message);
-    this.name = 'RateLimitError';
-    this.retryAfterSeconds = retryAfterSeconds;
-  }
-}
-
-function sleep(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-function parseRetryAfterSeconds(resp: Response, message: string): number | null {
-  const header = resp.headers.get('retry-after');
-  if (header && !Number.isNaN(Number(header))) return Number(header);
-  // Groq's own message usually spells out a wait, e.g. "Please try again in 12.3s".
-  const match = message.match(/try again in ([\d.]+)\s*s/i);
-  return match ? parseFloat(match[1]) : null;
-}
-
-async function callGroq(apiKey: string, model: string, prompt: string, jsonMode: boolean): Promise<string> {
-  let resp: Response;
-  try {
-    resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        authorization: `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: 'user', content: prompt }],
-        // Grading responses grew a lot once per-criterion evidence/missing text and a
-        // per-question confidence were added - without an explicit max_tokens, a long
-        // paper (many questions x criteria) could get cut off mid-JSON, which Groq's
-        // json_object validator rejects with "Failed to generate JSON". This account's
-        // tier caps prompt+completion at 8000 tokens total per request, so this has to
-        // leave real headroom for the prompt (criteria list + full OCR text) rather than
-        // claiming the whole budget for the completion alone.
-        ...(jsonMode ? { response_format: { type: 'json_object' }, max_tokens: 4000 } : {})
-      })
-    });
-  } catch (err) {
-    throw new Error(`Could not reach Groq API: ${(err as Error).message}`);
-  }
-
-  let data: GroqResponse;
-  try {
-    data = await resp.json();
-  } catch {
-    throw new Error(`Groq API returned a non-JSON response (status ${resp.status})`);
-  }
-
-  if (!resp.ok) {
-    const rawMessage = data.error?.message || `Groq API error (status ${resp.status})`;
-    if (resp.status === 429 || /rate limit/i.test(rawMessage)) {
-      throw new RateLimitError(rawMessage, parseRetryAfterSeconds(resp, rawMessage));
-    }
-    if (/request too large/i.test(rawMessage)) {
-      throw new Error(
-        'This paper is too long/text-heavy to grade in one request under the current API plan\'s per-request token limit. Try splitting it into smaller uploads, or upgrade the Groq plan.'
-      );
-    }
-    throw new Error(rawMessage);
-  }
-
-  const text = data.choices?.[0]?.message?.content;
-  if (!text) {
-    throw new Error('Groq API response had no text content');
-  }
-  return text;
-}
-
-const MAX_AUTO_WAIT_MS = 12000;
-
-/** Groq's json_object mode occasionally rejects a model's own output as invalid JSON
- *  ("Failed to generate JSON. Please adjust...") - non-deterministic, so retry once.
- *  A rate limit is handled differently: if Groq says the window resets soon (a free-tier
- *  per-minute limit, not a per-day one), wait that long and retry once automatically
- *  rather than making the teacher manually click "Grade sheets" again a few seconds later. */
-async function callGroqJsonWithRetry(apiKey: string, model: string, prompt: string): Promise<string> {
-  try {
-    return await callGroq(apiKey, model, prompt, true);
-  } catch (err) {
-    if (err instanceof RateLimitError) {
-      if (err.retryAfterSeconds !== null && err.retryAfterSeconds * 1000 <= MAX_AUTO_WAIT_MS) {
-        await sleep(err.retryAfterSeconds * 1000);
-        try {
-          return await callGroq(apiKey, model, prompt, true);
-        } catch (retryErr) {
-          throw friendlyRateLimitError(retryErr);
-        }
-      }
-      throw friendlyRateLimitError(err);
-    }
-    const message = (err as Error).message;
-    if (!/failed to generate json/i.test(message)) throw err;
-    return callGroq(apiKey, model, prompt, true);
-  }
-}
-
-function friendlyRateLimitError(err: unknown): Error {
-  if (!(err instanceof RateLimitError)) return err instanceof Error ? err : new Error(String(err));
-  const wait =
-    err.retryAfterSeconds !== null
-      ? `Groq says to wait about ${Math.ceil(err.retryAfterSeconds)}s and try again.`
-      : 'This usually clears within a minute or so - try grading again shortly.';
-  return new Error(
-    `Groq's free-tier API rate limit was reached (too many requests/tokens in a short window - common while testing or grading many papers back to back). ${wait} This isn't a bug in the paper or the grading logic.`
-  );
 }
 
 function normalizeDetectedSubject(raw: string): string {
@@ -157,12 +38,6 @@ function mismatchResult(selectedSubject: string, detectedSubject: string): Gradi
 }
 
 export async function POST(req: NextRequest) {
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json({ error: 'Server is missing GROQ_API_KEY' }, { status: 500 });
-  }
-  const model = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
-
   let body: GradeRequestBody;
   try {
     body = await req.json();
@@ -184,7 +59,7 @@ export async function POST(req: NextRequest) {
     const gradingPrompt = buildTextGradingPrompt(programme, courseworkType, TOK_SUBJECT_LABEL, level || '', ocrText);
     let text: string;
     try {
-      text = await callGroqJsonWithRetry(apiKey, model, gradingPrompt);
+      text = (await callWithFailover(gradingPrompt, true)).text;
     } catch (err) {
       return NextResponse.json({ error: (err as Error).message }, { status: 502 });
     }
@@ -208,7 +83,7 @@ export async function POST(req: NextRequest) {
   if (selectedSubject !== GENERAL_SUBJECT) {
     try {
       const detectionPrompt = buildSubjectDetectionPrompt(ocrText, DETECTABLE_SUBJECTS);
-      const rawDetected = await callGroq(apiKey, model, detectionPrompt, false);
+      const rawDetected = (await callWithFailover(detectionPrompt, false)).text;
       detectedSubject = normalizeDetectedSubject(rawDetected);
     } catch {
       // Detection is a verification step, not the grading itself - if it
@@ -231,7 +106,7 @@ export async function POST(req: NextRequest) {
 
   let text: string;
   try {
-    text = await callGroqJsonWithRetry(apiKey, model, gradingPrompt);
+    text = (await callWithFailover(gradingPrompt, true)).text;
   } catch (err) {
     return NextResponse.json({ error: (err as Error).message }, { status: 502 });
   }
