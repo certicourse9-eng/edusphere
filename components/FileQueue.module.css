@@ -22,11 +22,18 @@
 
 .row {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 6px 12px;
   padding: 8px 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
+}
+
+.row > .badge,
+.row > .name,
+.row > .studentId {
+  align-self: center;
 }
 
 .badge {
@@ -109,21 +116,21 @@
 }
 
 .errorMsg {
+  flex: 1 1 100%;
   font-size: 11.5px;
   color: var(--coral);
-  max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.4;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .reviewMsg {
+  flex: 1 1 100%;
   font-size: 11.5px;
   color: var(--amber);
-  max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.4;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .removeBtn {

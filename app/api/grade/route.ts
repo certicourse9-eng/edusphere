@@ -20,7 +20,30 @@ interface GradeRequestBody {
 
 interface GroqResponse {
   choices?: { message?: { content?: string } }[];
-  error?: { message?: string };
+  error?: { message?: string; type?: string };
+}
+
+/** Marks an error as a rate limit specifically, carrying how long Groq says to wait
+ *  (seconds), so callers can decide whether a short automatic retry is worth it. */
+class RateLimitError extends Error {
+  retryAfterSeconds: number | null;
+  constructor(message: string, retryAfterSeconds: number | null) {
+    super(message);
+    this.name = 'RateLimitError';
+    this.retryAfterSeconds = retryAfterSeconds;
+  }
+}
+
+function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function parseRetryAfterSeconds(resp: Response, message: string): number | null {
+  const header = resp.headers.get('retry-after');
+  if (header && !Number.isNaN(Number(header))) return Number(header);
+  // Groq's own message usually spells out a wait, e.g. "Please try again in 12.3s".
+  const match = message.match(/try again in ([\d.]+)\s*s/i);
+  return match ? parseFloat(match[1]) : null;
 }
 
 async function callGroq(apiKey: string, model: string, prompt: string, jsonMode: boolean): Promise<string> {
@@ -58,6 +81,9 @@ async function callGroq(apiKey: string, model: string, prompt: string, jsonMode:
 
   if (!resp.ok) {
     const rawMessage = data.error?.message || `Groq API error (status ${resp.status})`;
+    if (resp.status === 429 || /rate limit/i.test(rawMessage)) {
+      throw new RateLimitError(rawMessage, parseRetryAfterSeconds(resp, rawMessage));
+    }
     if (/request too large/i.test(rawMessage)) {
       throw new Error(
         'This paper is too long/text-heavy to grade in one request under the current API plan\'s per-request token limit. Try splitting it into smaller uploads, or upgrade the Groq plan.'
@@ -73,18 +99,43 @@ async function callGroq(apiKey: string, model: string, prompt: string, jsonMode:
   return text;
 }
 
+const MAX_AUTO_WAIT_MS = 12000;
+
 /** Groq's json_object mode occasionally rejects a model's own output as invalid JSON
- *  ("Failed to generate JSON. Please adjust...") - this is non-deterministic (the same
- *  prompt often succeeds on a second try), so retry once before surfacing it as a real
- *  failure to the teacher. */
+ *  ("Failed to generate JSON. Please adjust...") - non-deterministic, so retry once.
+ *  A rate limit is handled differently: if Groq says the window resets soon (a free-tier
+ *  per-minute limit, not a per-day one), wait that long and retry once automatically
+ *  rather than making the teacher manually click "Grade sheets" again a few seconds later. */
 async function callGroqJsonWithRetry(apiKey: string, model: string, prompt: string): Promise<string> {
   try {
     return await callGroq(apiKey, model, prompt, true);
   } catch (err) {
+    if (err instanceof RateLimitError) {
+      if (err.retryAfterSeconds !== null && err.retryAfterSeconds * 1000 <= MAX_AUTO_WAIT_MS) {
+        await sleep(err.retryAfterSeconds * 1000);
+        try {
+          return await callGroq(apiKey, model, prompt, true);
+        } catch (retryErr) {
+          throw friendlyRateLimitError(retryErr);
+        }
+      }
+      throw friendlyRateLimitError(err);
+    }
     const message = (err as Error).message;
     if (!/failed to generate json/i.test(message)) throw err;
     return callGroq(apiKey, model, prompt, true);
   }
+}
+
+function friendlyRateLimitError(err: unknown): Error {
+  if (!(err instanceof RateLimitError)) return err instanceof Error ? err : new Error(String(err));
+  const wait =
+    err.retryAfterSeconds !== null
+      ? `Groq says to wait about ${Math.ceil(err.retryAfterSeconds)}s and try again.`
+      : 'This usually clears within a minute or so - try grading again shortly.';
+  return new Error(
+    `Groq's free-tier API rate limit was reached (too many requests/tokens in a short window - common while testing or grading many papers back to back). ${wait} This isn't a bug in the paper or the grading logic.`
+  );
 }
 
 function normalizeDetectedSubject(raw: string): string {
