@@ -6,7 +6,6 @@ import ClassProgressBar from '@/components/ClassProgressBar';
 import Dashboard from '@/components/Dashboard';
 import HeroBlobs from '@/components/HeroBlobs';
 import AnalyticsPreviewCard from '@/components/analytics/AnalyticsPreviewCard';
-import GradeBoundariesPanel from '@/components/GradeBoundariesPanel';
 import { useClassSession } from '@/lib/ClassSessionContext';
 
 export default function Page() {
@@ -24,7 +23,6 @@ export default function Page() {
     expectedStudentCount,
     setExpectedStudentCount,
     gradeBoundaries,
-    setGradeBoundaries,
     files,
     running,
     addFiles,
@@ -81,8 +79,6 @@ export default function Page() {
         canRun={canRun}
         progressLabel={progressLabel}
       />
-
-      <GradeBoundariesPanel programme={programme} boundaries={gradeBoundaries} onChange={setGradeBoundaries} />
 
       {total > 0 && (
         <ClassProgressBar
