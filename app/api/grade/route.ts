@@ -2,18 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import { buildSubjectDetectionPrompt, buildTextGradingPrompt } from '@/lib/prompt';
 import { parseGradingResponse } from '@/lib/parseGradingResponse';
 import { SUBJECTS } from '@/lib/subjectIcons';
-import type { CourseworkType, GradingResult } from '@/lib/types';
+import type { CourseworkType, GradingResult, IBProgramme } from '@/lib/types';
 
 const GENERAL_SUBJECT = 'General / Other';
 const TOK_SUBJECT_LABEL = 'Theory of Knowledge';
 const DETECTABLE_SUBJECTS = SUBJECTS.filter(s => s !== GENERAL_SUBJECT);
 const COURSEWORK_TYPES: CourseworkType[] = ['internal-assessment', 'extended-essay', 'tok', 'external-assessment', 'exam'];
+const PROGRAMMES: IBProgramme[] = ['DP', 'MYP'];
 
 interface GradeRequestBody {
   ocrText?: string;
   subject?: string;
   level?: string;
   courseworkType?: string;
+  programme?: string;
 }
 
 interface GroqResponse {
@@ -117,17 +119,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const { ocrText, subject, level, courseworkType: rawCourseworkType } = body;
+  const { ocrText, subject, level, courseworkType: rawCourseworkType, programme: rawProgramme } = body;
   if (!ocrText || typeof ocrText !== 'string') {
     return NextResponse.json({ error: 'Request body must include an "ocrText" string' }, { status: 400 });
   }
   const courseworkType: CourseworkType = COURSEWORK_TYPES.includes(rawCourseworkType as CourseworkType)
     ? (rawCourseworkType as CourseworkType)
     : 'external-assessment';
+  const programme: IBProgramme = PROGRAMMES.includes(rawProgramme as IBProgramme) ? (rawProgramme as IBProgramme) : 'DP';
 
   // TOK has no subject concept at all - skip subject requirements/verification entirely.
   if (courseworkType === 'tok') {
-    const gradingPrompt = buildTextGradingPrompt(courseworkType, TOK_SUBJECT_LABEL, level || '', ocrText);
+    const gradingPrompt = buildTextGradingPrompt(programme, courseworkType, TOK_SUBJECT_LABEL, level || '', ocrText);
     let text: string;
     try {
       text = await callGroqJsonWithRetry(apiKey, model, gradingPrompt);
@@ -173,7 +176,7 @@ export async function POST(req: NextRequest) {
   }
 
   const gradingSubject = selectedSubject;
-  const gradingPrompt = buildTextGradingPrompt(courseworkType, gradingSubject, level, ocrText);
+  const gradingPrompt = buildTextGradingPrompt(programme, courseworkType, gradingSubject, level, ocrText);
 
   let text: string;
   try {

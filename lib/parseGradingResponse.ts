@@ -15,6 +15,7 @@ function normalizeAnnotations(raw: unknown): Annotation[] {
         comment: typeof a.comment === 'string' ? a.comment : ''
       };
       if (typeof a.criterionCode === 'string' && a.criterionCode) annotation.criterionCode = a.criterionCode;
+      if (typeof a.questionNumber === 'number') annotation.questionNumber = a.questionNumber;
       return annotation;
     })
     .filter(a => a.comment.length > 0);

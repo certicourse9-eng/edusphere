@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useState } from 'react';
 import { gradeFile } from './gradeClient';
 import { deriveStudentId } from './studentId';
 import { buildCsv, downloadCsv } from './csv';
-import type { StudentFile, Level, CourseworkType, IBProgramme, FileStatus } from './types';
+import type { StudentFile, Level, CourseworkType, IBProgramme, FileStatus, GradeBoundary } from './types';
 import { FINISHED_STATUSES } from './types';
 
 let idCounter = 0;
@@ -28,12 +28,15 @@ interface ClassSessionValue {
   setLevel: (l: Level) => void;
   expectedStudentCount: string;
   setExpectedStudentCount: (v: string) => void;
+  gradeBoundaries: GradeBoundary[];
+  setGradeBoundaries: (b: GradeBoundary[]) => void;
   files: StudentFile[];
   running: boolean;
   addFiles: (files: File[]) => void;
   removeFile: (id: string) => void;
   updateTeacherFeedback: (id: string, text: string) => void;
   approveFile: (id: string) => void;
+  setTeacherOverrideScore: (id: string, score: number | null) => void;
   runPipeline: () => Promise<void>;
   handleExport: () => void;
   total: number;
@@ -62,6 +65,7 @@ export function ClassSessionProvider({ children }: { children: React.ReactNode }
   const [subject, setSubject] = useState('Mathematics AA');
   const [level, setLevel] = useState<Level>('HL');
   const [expectedStudentCount, setExpectedStudentCount] = useState('');
+  const [gradeBoundaries, setGradeBoundaries] = useState<GradeBoundary[]>([]);
   const [files, setFiles] = useState<StudentFile[]>([]);
   const [running, setRunning] = useState(false);
 
@@ -92,6 +96,10 @@ export function ClassSessionProvider({ children }: { children: React.ReactNode }
     setFiles(prev => prev.map(f => (f.id === id ? { ...f, status: 'teacher-approved' as FileStatus } : f)));
   }, []);
 
+  const setTeacherOverrideScore = useCallback((id: string, score: number | null) => {
+    setFiles(prev => prev.map(f => (f.id === id ? { ...f, teacherOverrideScore: score } : f)));
+  }, []);
+
   const setStatus = useCallback((id: string, status: FileStatus) => {
     setFiles(prev => prev.map(f => (f.id === id ? { ...f, status } : f)));
   }, []);
@@ -99,6 +107,7 @@ export function ClassSessionProvider({ children }: { children: React.ReactNode }
   const runPipeline = useCallback(async () => {
     if (running) return;
     setRunning(true);
+    const runProgramme = programme;
     const runCourseworkType = courseworkType;
     const runSubject = subject;
     const runLevel = level;
@@ -109,6 +118,7 @@ export function ClassSessionProvider({ children }: { children: React.ReactNode }
       try {
         const { result, ocrText, ocrPages, ocrConfidence } = await gradeFile(
           entry.file,
+          runProgramme,
           runCourseworkType,
           runSubject,
           runLevel,
@@ -128,7 +138,16 @@ export function ClassSessionProvider({ children }: { children: React.ReactNode }
         setFiles(prev =>
           prev.map(f =>
             f.id === entry.id
-              ? { ...f, status: finalStatus, result, ocrText, ocrPages, ocrConfidence: ocrConfidence ?? undefined, reviewReason }
+              ? {
+                  ...f,
+                  status: finalStatus,
+                  result,
+                  ocrText,
+                  ocrPages,
+                  ocrConfidence: ocrConfidence ?? undefined,
+                  reviewReason,
+                  programme: runProgramme
+                }
               : f
           )
         );
@@ -140,11 +159,11 @@ export function ClassSessionProvider({ children }: { children: React.ReactNode }
     }
 
     setRunning(false);
-  }, [files, running, courseworkType, subject, level, setStatus]);
+  }, [files, running, programme, courseworkType, subject, level, setStatus]);
 
   const handleExport = useCallback(() => {
-    downloadCsv(buildCsv(files), 'grading-results.csv');
-  }, [files]);
+    downloadCsv(buildCsv(files, gradeBoundaries), 'grading-results.csv');
+  }, [files, gradeBoundaries]);
 
   const total = files.length;
   const expected = parseInt(expectedStudentCount, 10) || 0;
@@ -172,12 +191,15 @@ export function ClassSessionProvider({ children }: { children: React.ReactNode }
     setLevel,
     expectedStudentCount,
     setExpectedStudentCount,
+    gradeBoundaries,
+    setGradeBoundaries,
     files,
     running,
     addFiles,
     removeFile,
     updateTeacherFeedback,
     approveFile,
+    setTeacherOverrideScore,
     runPipeline,
     handleExport,
     total,

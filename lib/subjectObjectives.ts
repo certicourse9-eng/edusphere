@@ -1,4 +1,4 @@
-import type { CourseworkType } from './types';
+import type { CourseworkType, IBProgramme } from './types';
 
 /**
  * IB DP-style assessment criteria, used so grading is broken down the way a
@@ -193,11 +193,89 @@ const TOK_CRITERIA: SubjectCriterion[] = [
   { code: 'D', name: 'Structure and clarity', description: 'Organizes the response clearly with coherent, well-expressed ideas.', maxScore: 2 }
 ];
 
-export function getCriteria(courseworkType: CourseworkType, subject: string): SubjectCriterion[] {
+// ---------- MYP (Middle Years Programme) subject-group criteria ----------
+// MYP grades each subject against exactly 4 criteria (A-D), each scored as an
+// achievement LEVEL from 0-8 (not raw exam marks) - a structurally different
+// model from DP's assessment-objective marking above. Criteria are assigned
+// per MYP subject GROUP (Sciences, Mathematics, Individuals & Societies,
+// Language and Literature, Design) since that's what the real MYP subject
+// guides define; EduSphere's subject list is DP-flavoured, so each DP
+// subject name below maps to its corresponding MYP subject-group criteria.
+// Names follow the shape of the published MYP subject-group criteria;
+// descriptions are original wording, not copied from official IB guides.
+
+const mypSciences: SubjectCriterion[] = [
+  { code: 'A', name: 'Knowing and understanding', description: 'Recall scientific knowledge and apply it to construct explanations of phenomena and solve problems.', maxScore: 8 },
+  { code: 'B', name: 'Inquiring and designing', description: 'Formulate a testable question or hypothesis and design a methodical, controlled investigation.', maxScore: 8 },
+  { code: 'C', name: 'Processing and evaluating', description: 'Present, interpret, and process data accurately, and evaluate the investigation’s validity.', maxScore: 8 },
+  { code: 'D', name: 'Reflecting on the impacts of science', description: 'Explain the ways science is applied to solve problems and evaluate its implications.', maxScore: 8 }
+];
+
+const mypMathematics: SubjectCriterion[] = [
+  { code: 'A', name: 'Knowing and understanding', description: 'Select and apply the appropriate mathematical knowledge and techniques correctly.', maxScore: 8 },
+  { code: 'B', name: 'Investigating patterns', description: 'Look for patterns, describe them as relationships or rules, and justify or verify them.', maxScore: 8 },
+  { code: 'C', name: 'Communicating', description: 'Use appropriate mathematical language and multiple forms of representation clearly.', maxScore: 8 },
+  { code: 'D', name: 'Applying mathematics in real-life contexts', description: 'Identify relevant elements of a real-world situation and apply mathematics to solve it.', maxScore: 8 }
+];
+
+const mypIndividualsAndSocieties: SubjectCriterion[] = [
+  { code: 'A', name: 'Knowing and understanding', description: 'Recall relevant terminology, concepts, and content accurately.', maxScore: 8 },
+  { code: 'B', name: 'Investigating', description: 'Formulate a clear, focused question and plan and follow a research process to answer it.', maxScore: 8 },
+  { code: 'C', name: 'Communicating', description: 'Communicate ideas using appropriate terminology in a style suited to the audience and purpose.', maxScore: 8 },
+  { code: 'D', name: 'Thinking critically', description: 'Analyse and evaluate a range of sources, evidence, and perspectives to form a conclusion.', maxScore: 8 }
+];
+
+const mypLanguageAndLiterature: SubjectCriterion[] = [
+  { code: 'A', name: 'Analysing', description: 'Analyse content, context, language, structure, technique, and style in a range of texts.', maxScore: 8 },
+  { code: 'B', name: 'Organizing', description: 'Organize ideas and arguments coherently, with an effective, logical structure.', maxScore: 8 },
+  { code: 'C', name: 'Producing text', description: 'Produce imaginative, coherent, and stylistically effective text for a range of purposes.', maxScore: 8 },
+  { code: 'D', name: 'Using language', description: 'Use accurate, varied language appropriate to the context and register.', maxScore: 8 }
+];
+
+const mypDesign: SubjectCriterion[] = [
+  { code: 'A', name: 'Inquiring and analysing', description: 'Explain and justify the need for a solution to a problem, and analyse relevant research.', maxScore: 8 },
+  { code: 'B', name: 'Developing ideas', description: 'Develop feasible design specifications and a range of justified, testable design ideas.', maxScore: 8 },
+  { code: 'C', name: 'Creating the solution', description: 'Follow a plan to create a solution that is fit for purpose.', maxScore: 8 },
+  { code: 'D', name: 'Evaluating', description: 'Evaluate the solution’s success against the design specification, with justified improvements.', maxScore: 8 }
+];
+
+const mypGeneral: SubjectCriterion[] = [
+  { code: 'A', name: 'Knowing and understanding', description: 'Recall and explain relevant subject knowledge accurately.', maxScore: 8 },
+  { code: 'B', name: 'Investigating / applying', description: 'Apply knowledge and skills to investigate or solve the specific task set.', maxScore: 8 },
+  { code: 'C', name: 'Communicating', description: 'Communicate ideas clearly, using appropriate terminology and structure.', maxScore: 8 },
+  { code: 'D', name: 'Thinking critically / reflecting', description: 'Analyse, evaluate, or reflect critically on the work and its wider implications.', maxScore: 8 }
+];
+
+const MYP_CRITERIA: Record<string, SubjectCriterion[]> = {
+  Biology: mypSciences,
+  Chemistry: mypSciences,
+  Physics: mypSciences,
+  'Computer Science': mypDesign,
+  'Mathematics AA': mypMathematics,
+  'Mathematics AI': mypMathematics,
+  'Business Management': mypIndividualsAndSocieties,
+  Economics: mypIndividualsAndSocieties,
+  History: mypIndividualsAndSocieties,
+  Psychology: mypIndividualsAndSocieties,
+  'English A Language & Literature': mypLanguageAndLiterature,
+  [GENERAL_SUBJECT]: mypGeneral
+};
+
+export function getCriteria(programme: IBProgramme, courseworkType: CourseworkType, subject: string): SubjectCriterion[] {
+  // Extended Essay and TOK are DP/CP components with no MYP equivalent - grade them the
+  // same fixed way regardless of programme rather than inventing an MYP-flavoured version.
   if (courseworkType === 'extended-essay') return EXTENDED_ESSAY_CRITERIA;
   if (courseworkType === 'tok') return TOK_CRITERIA;
+
+  if (programme === 'MYP') return MYP_CRITERIA[subject] ?? mypGeneral;
+
   if (courseworkType === 'internal-assessment') return INTERNAL_CRITERIA[subject] ?? generalInternal;
   // 'external-assessment' and 'exam' are graded the same way — externally-set,
   // subject-specific assessment objective criteria.
   return EXTERNAL_CRITERIA[subject] ?? generalExternal;
+}
+
+/** True for criteria scored as an MYP achievement level (0-8) rather than DP-style raw marks. */
+export function isMypCriteria(programme: IBProgramme, courseworkType: CourseworkType): boolean {
+  return programme === 'MYP' && courseworkType !== 'extended-essay' && courseworkType !== 'tok';
 }

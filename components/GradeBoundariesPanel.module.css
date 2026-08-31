@@ -1,0 +1,109 @@
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.toggle {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 20px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: var(--font-sora), sans-serif;
+  font-weight: 700;
+  font-size: 13.5px;
+  color: var(--text);
+}
+
+.optional {
+  font-weight: 500;
+  font-size: 11.5px;
+  color: var(--text-soft);
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono), monospace;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+.chevron {
+  color: var(--primary);
+}
+
+.body {
+  padding: 0 20px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-soft);
+  line-height: 1.5;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.gradeLabel {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+.inputWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.inputWrap input {
+  width: 100%;
+  padding: 8px 26px 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.inputWrap input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(76, 141, 255, 0.12);
+}
+
+.percentSign {
+  position: absolute;
+  right: 10px;
+  font-size: 12px;
+  color: var(--text-soft);
+  pointer-events: none;
+}
+
+.warnNote {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--amber);
+}

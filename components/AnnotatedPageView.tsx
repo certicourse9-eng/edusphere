@@ -3,11 +3,28 @@
 import { useMemo, useState } from 'react';
 import styles from './AnnotatedPageView.module.css';
 import { ANNOTATION_TYPE_LABELS } from '@/lib/types';
-import type { Annotation, OcrPage } from '@/lib/types';
+import { computeGradeFromBoundaries } from '@/lib/gradeBoundaries';
+import type { Annotation, GradeBoundary, GradedQuestion, IBProgramme, OcrPage } from '@/lib/types';
 
 interface AnnotatedPageViewProps {
   pages: OcrPage[];
   annotations: Annotation[];
+  questions: GradedQuestion[];
+  totalScore: number;
+  maxTotal: number;
+  teacherOverrideScore?: number | null;
+  gradeBoundaries: GradeBoundary[];
+  programme: IBProgramme;
+}
+
+/** Resolves an annotation back to the actual raw marks it's about, via questionNumber +
+ *  criterionCode - so the highlight on the paper can show real numbers, not just a reaction. */
+function resolveMark(annotation: Annotation, questions: GradedQuestion[]): { score: number; maxScore: number } | null {
+  if (!annotation.criterionCode) return null;
+  const question =
+    annotation.questionNumber !== undefined ? questions.find(q => q.number === annotation.questionNumber) : questions[0];
+  const criterion = question?.criteria.find(c => c.code === annotation.criterionCode);
+  return criterion ? { score: criterion.score, maxScore: criterion.maxScore } : null;
 }
 
 interface LineMark {
@@ -106,10 +123,39 @@ function computePageMarks(pages: OcrPage[], annotations: Annotation[], dims: Rec
   return perPage;
 }
 
-export default function AnnotatedPageView({ pages, annotations }: AnnotatedPageViewProps) {
+export default function AnnotatedPageView({
+  pages,
+  annotations,
+  questions,
+  totalScore,
+  maxTotal,
+  teacherOverrideScore,
+  gradeBoundaries,
+  programme
+}: AnnotatedPageViewProps) {
   const [hoveredGroup, setHoveredGroup] = useState<string | null>(null);
   const [dims, setDims] = useState<Record<number, ImageDims>>({});
   const perPageMarks = useMemo(() => computePageMarks(pages, annotations, dims), [pages, annotations, dims]);
+
+  const isOverridden = typeof teacherOverrideScore === 'number';
+  const effectiveScore = isOverridden ? (teacherOverrideScore as number) : totalScore;
+  const pct = maxTotal > 0 ? effectiveScore / maxTotal : 0;
+  const grade = computeGradeFromBoundaries(pct, gradeBoundaries);
+  const gradeScaleLabel = programme === 'MYP' ? 'MYP subject grade' : 'IB course grade';
+
+  const criterionTotals = useMemo(() => {
+    const totals = new Map<string, { code: string; name: string; score: number; maxScore: number }>();
+    questions.forEach(q => {
+      q.criteria.forEach(c => {
+        const key = `${c.code}::${c.name}`;
+        const entry = totals.get(key) ?? { code: c.code, name: c.name, score: 0, maxScore: 0 };
+        entry.score += c.score;
+        entry.maxScore += c.maxScore;
+        totals.set(key, entry);
+      });
+    });
+    return Array.from(totals.values());
+  }, [questions]);
 
   if (pages.length === 0 || pages.every(p => !p.imageDataUrl)) {
     return <p className={styles.emptyNote}>No page images available to annotate for this sheet.</p>;
@@ -200,6 +246,8 @@ export default function AnnotatedPageView({ pages, annotations }: AnnotatedPageV
                   const isActive = hoveredGroup === m.groupKey;
                   const words = MASCOT_WORDS[m.annotation.type];
                   const word = words[m.annotationIndex % words.length];
+                  const mark = resolveMark(m.annotation, questions);
+                  const bubbleText = mark ? `${word} ${mark.score}/${mark.maxScore}` : word;
                   // If the line runs close to the page's right edge there's no room to sit
                   // beside it without overlapping the last word - drop below the line instead.
                   const rightMargin = 100 - (m.leftPct + m.widthPct);
@@ -221,10 +269,10 @@ export default function AnnotatedPageView({ pages, annotations }: AnnotatedPageV
                       onFocus={() => setHoveredGroup(m.groupKey)}
                       onBlur={() => setHoveredGroup(prev => (prev === m.groupKey ? null : prev))}
                       onClick={() => setHoveredGroup(prev => (prev === m.groupKey ? null : m.groupKey))}
-                      aria-label={`${ANNOTATION_TYPE_LABELS[m.annotation.type]} mascot: ${word}`}
+                      aria-label={`${ANNOTATION_TYPE_LABELS[m.annotation.type]} mascot: ${bubbleText}`}
                     >
                       <span className={styles.dinoInner}>
-                        <span className={styles.dinoBubble}>{word}</span>
+                        <span className={styles.dinoBubble}>{bubbleText}</span>
                         <span className={styles.dinoEmoji} aria-hidden="true">
                           🦕
                         </span>
@@ -245,6 +293,46 @@ export default function AnnotatedPageView({ pages, annotations }: AnnotatedPageV
             {TYPE_ICON[type]} {ANNOTATION_TYPE_LABELS[type]}
           </span>
         ))}
+      </div>
+
+      <div className={styles.summary}>
+        <p className={styles.summaryTitle}>Summary</p>
+        <div className={styles.summaryGrid}>
+          <div className={styles.summaryStat}>
+            <span className={styles.summaryLabel}>Marks obtained / maximum</span>
+            <span className={styles.summaryValue}>
+              {effectiveScore}/{maxTotal}
+              {isOverridden && <span className={styles.summaryOverrideTag}>teacher-adjusted</span>}
+            </span>
+          </div>
+          <div className={styles.summaryStat}>
+            <span className={styles.summaryLabel}>Raw total</span>
+            <span className={styles.summaryValue}>{effectiveScore}</span>
+          </div>
+          <div className={styles.summaryStat}>
+            <span className={styles.summaryLabel}>Percentage</span>
+            <span className={styles.summaryValue}>{Math.round(pct * 100)}%</span>
+          </div>
+          <div className={styles.summaryStat}>
+            <span className={styles.summaryLabel}>{gradeScaleLabel}</span>
+            <span className={styles.summaryValue}>
+              {grade !== null ? grade : <span className={styles.summaryUnavailable}>not available</span>}
+            </span>
+          </div>
+        </div>
+
+        {criterionTotals.length > 0 && (
+          <>
+            <p className={styles.summarySubtitle}>Criterion scores</p>
+            <div className={styles.criterionSummaryList}>
+              {criterionTotals.map(c => (
+                <span key={c.code + c.name} className={styles.criterionSummaryChip}>
+                  <strong>{c.code}</strong> {c.name}: {c.score}/{c.maxScore}
+                </span>
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

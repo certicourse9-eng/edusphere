@@ -50,7 +50,11 @@ export default function UploadPanel({
   progressLabel
 }: UploadPanelProps) {
   const showSubject = courseworkType !== 'tok';
-  const showLevel = courseworkType === 'internal-assessment' || courseworkType === 'external-assessment' || courseworkType === 'exam';
+  // SL/HL is a DP-only concept - MYP grades against subject-group criteria and a
+  // year/grade level (already captured by the Grade/Year field above), not SL/HL.
+  const showLevel =
+    programme === 'DP' &&
+    (courseworkType === 'internal-assessment' || courseworkType === 'external-assessment' || courseworkType === 'exam');
   const [dragActive, setDragActive] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -126,7 +130,8 @@ export default function UploadPanel({
       </div>
       {programme === 'MYP' && (
         <p className={styles.autoSubjectNote}>
-          MYP-specific criteria aren&apos;t built yet — sheets are graded with the DP-style criteria below as an approximation until MYP criteria are added.
+          Graded against real MYP subject-group criteria (4 criteria, A–D, each an achievement level out of 8) rather than
+          the DP model — the exact criteria change automatically based on the subject you pick below.
         </p>
       )}
 

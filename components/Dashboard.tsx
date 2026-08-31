@@ -3,9 +3,10 @@
 import { Fragment, useState } from 'react';
 import styles from './Dashboard.module.css';
 import StudentReportRow from './StudentReportRow';
-import { getBand, approxIbGrade } from '@/lib/gradeBands';
+import { getBand } from '@/lib/gradeBands';
+import { computeGradeFromBoundaries } from '@/lib/gradeBoundaries';
 import { FILE_STATUS_LABELS, FINISHED_STATUSES } from '@/lib/types';
-import type { FileStatus, StudentFile } from '@/lib/types';
+import type { FileStatus, GradeBoundary, IBProgramme, StudentFile } from '@/lib/types';
 
 type FilterOption = 'all' | 'evaluated' | 'pending' | 'processing' | 'needs-review' | 'teacher-approved' | 'failed';
 
@@ -31,11 +32,23 @@ interface DashboardProps {
   files: StudentFile[];
   onTeacherFeedbackChange: (id: string, text: string) => void;
   onApprove: (id: string) => void;
+  onTeacherOverrideScoreChange: (id: string, score: number | null) => void;
   onExport: () => void;
   exportDisabled: boolean;
+  gradeBoundaries: GradeBoundary[];
+  programme: IBProgramme;
 }
 
-export default function Dashboard({ files, onTeacherFeedbackChange, onApprove, onExport, exportDisabled }: DashboardProps) {
+export default function Dashboard({
+  files,
+  onTeacherFeedbackChange,
+  onApprove,
+  onTeacherOverrideScoreChange,
+  onExport,
+  exportDisabled,
+  gradeBoundaries,
+  programme
+}: DashboardProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterOption>('all');
@@ -135,14 +148,23 @@ export default function Dashboard({ files, onTeacherFeedbackChange, onApprove, o
                     <td>{r ? r.questions.length : '—'}</td>
                     <td>
                       {r ? (
-                        <>
-                          <span className={`${styles.gradePill} ${styles[getBand(r.totalScore, r.maxTotal)]}`}>
-                            {approxIbGrade(r.totalScore, r.maxTotal)}
-                          </span>
-                          <span className={styles.miniScore}>
-                            {r.totalScore}/{r.maxTotal}
-                          </span>
-                        </>
+                        (() => {
+                          const overridden = typeof f.teacherOverrideScore === 'number';
+                          const effectiveScore = overridden ? (f.teacherOverrideScore as number) : r.totalScore;
+                          const pct = r.maxTotal > 0 ? effectiveScore / r.maxTotal : 0;
+                          const grade = computeGradeFromBoundaries(pct, gradeBoundaries);
+                          return (
+                            <>
+                              <span className={`${styles.gradePill} ${styles[getBand(effectiveScore, r.maxTotal)]}`}>
+                                {grade ?? `${Math.round(pct * 100)}%`}
+                              </span>
+                              <span className={styles.miniScore}>
+                                {effectiveScore}/{r.maxTotal}
+                                {overridden && <span className={styles.overriddenTag} title="Teacher-adjusted final score">T</span>}
+                              </span>
+                            </>
+                          );
+                        })()
                       ) : (
                         <span className={`${styles.statusPill} ${styles[f.status]}`}>{FILE_STATUS_LABELS[f.status]}</span>
                       )}
@@ -159,7 +181,13 @@ export default function Dashboard({ files, onTeacherFeedbackChange, onApprove, o
                   {isOpen && r && (
                     <tr className={styles.detailRow}>
                       <td colSpan={7}>
-                        <StudentReportRow file={f} onTeacherFeedbackChange={text => onTeacherFeedbackChange(f.id, text)} />
+                        <StudentReportRow
+                          file={f}
+                          onTeacherFeedbackChange={text => onTeacherFeedbackChange(f.id, text)}
+                          onTeacherOverrideScoreChange={score => onTeacherOverrideScoreChange(f.id, score)}
+                          gradeBoundaries={gradeBoundaries}
+                          programme={f.programme ?? programme}
+                        />
                       </td>
                     </tr>
                   )}

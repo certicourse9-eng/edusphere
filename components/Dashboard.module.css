@@ -185,6 +185,21 @@
   font-weight: 600;
 }
 
+.overriddenTag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  margin-left: 5px;
+  border-radius: 4px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
 .good {
   background: rgba(47, 191, 113, 0.14);
   color: var(--green);

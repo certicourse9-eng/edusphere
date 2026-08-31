@@ -82,6 +82,10 @@ export const ANNOTATION_TYPE_LABELS: Record<AnnotationType, string> = {
 export interface Annotation {
   type: AnnotationType;
   criterionCode?: string;
+  /** Which question this annotation belongs to, so the awarded raw marks for its criterion
+   *  can be resolved and shown alongside the highlight. Undefined for holistic pieces
+   *  (Extended Essay/TOK) where there's only ever one synthetic question. */
+  questionNumber?: number;
   lineStart: number;
   lineEnd: number;
   comment: string;
@@ -124,4 +128,22 @@ export interface StudentFile {
   ocrConfidence?: number;
   /** Set when status is 'needs-review' or 'failed', explaining why. */
   reviewReason?: string;
+  /** The teacher's own final total score, kept entirely separate from the AI's result.totalScore.
+   *  Null means the teacher hasn't overridden anything - the AI score stands as-is pending review. */
+  teacherOverrideScore?: number | null;
+  /** The programme this file was actually graded under - NOT the class setup's current
+   *  programme value, which can change after this file is graded if the teacher switches
+   *  programme for a later upload in the same session. Grade-scale labels (MYP subject grade
+   *  vs IB course grade) must follow this, not the live setting, or old results get relabelled
+   *  incorrectly. Undefined until the file has actually been graded once. */
+  programme?: IBProgramme;
+}
+
+/** One point on a 1-7 grade-boundary scale: "a percentage of at least minPercent earns this
+ *  grade". Real IB grade boundaries are set per subject/session and are NOT a fixed formula -
+ *  EduSphere never invents them. A grade is only ever shown when a teacher has entered real
+ *  boundaries for this class here; otherwise only the raw score/percentage is shown. */
+export interface GradeBoundary {
+  grade: 1 | 2 | 3 | 4 | 5 | 6 | 7;
+  minPercent: number;
 }

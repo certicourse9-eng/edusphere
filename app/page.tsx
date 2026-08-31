@@ -6,6 +6,7 @@ import ClassProgressBar from '@/components/ClassProgressBar';
 import Dashboard from '@/components/Dashboard';
 import HeroBlobs from '@/components/HeroBlobs';
 import AnalyticsPreviewCard from '@/components/analytics/AnalyticsPreviewCard';
+import GradeBoundariesPanel from '@/components/GradeBoundariesPanel';
 import { useClassSession } from '@/lib/ClassSessionContext';
 
 export default function Page() {
@@ -22,12 +23,15 @@ export default function Page() {
     setLevel,
     expectedStudentCount,
     setExpectedStudentCount,
+    gradeBoundaries,
+    setGradeBoundaries,
     files,
     running,
     addFiles,
     removeFile,
     updateTeacherFeedback,
     approveFile,
+    setTeacherOverrideScore,
     runPipeline,
     handleExport,
     total,
@@ -78,6 +82,8 @@ export default function Page() {
         progressLabel={progressLabel}
       />
 
+      <GradeBoundariesPanel programme={programme} boundaries={gradeBoundaries} onChange={setGradeBoundaries} />
+
       {total > 0 && (
         <ClassProgressBar
           expected={expected}
@@ -98,8 +104,11 @@ export default function Page() {
         files={files}
         onTeacherFeedbackChange={updateTeacherFeedback}
         onApprove={approveFile}
+        onTeacherOverrideScoreChange={setTeacherOverrideScore}
         onExport={handleExport}
         exportDisabled={finishedCount === 0}
+        gradeBoundaries={gradeBoundaries}
+        programme={programme}
       />
     </main>
   );

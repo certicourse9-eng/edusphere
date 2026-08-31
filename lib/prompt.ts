@@ -1,5 +1,5 @@
-import { getCriteria } from './subjectObjectives';
-import type { CourseworkType } from './types';
+import { getCriteria, isMypCriteria } from './subjectObjectives';
+import type { CourseworkType, IBProgramme } from './types';
 
 export function buildSubjectDetectionPrompt(ocrText: string, knownSubjects: string[]): string {
   return `The text below was extracted by OCR from a scanned IB student answer sheet. Based ONLY on the subject matter of the questions and answers, decide which ONE of these subjects it belongs to:
@@ -36,22 +36,29 @@ const EMPTY_RESULT_JSON =
 
 const ANNOTATIONS_INSTRUCTION = `Every line of the OCR text below is prefixed with a marker like [L12] - a global line number. In ADDITION to the scoring above, produce an "annotations" array: one entry per specific point worth marking directly on the original scanned page (praise, an error, a missed opportunity, or a note tied to one criterion). For each annotation:
 - "type": one of "strength", "weakness", "suggestion", "criterion"
+- "questionNumber": the question "number" this annotation belongs to (from the questions above)
 - "criterionCode": the matching criterion code from above if this annotation is specifically about one named criterion (use "" if it's more general)
 - "lineStart" and "lineEnd": the first and last line marker NUMBERS (just the number, not the letter L) this annotation refers to - use the same number for both if it's a single line
 - "comment": a short note (20 words or fewer) explaining this specific point, written directly to the student
 
 Produce 3-8 annotations, covering a mix of strengths, weaknesses, and suggestions spread across different lines (not all clustered on one line) - these are the kinds of things a teacher would circle or underline directly on the paper.`;
 
-const ANNOTATIONS_EXAMPLE = '"annotations":[{"type":"strength","criterionCode":"","lineStart":0,"lineEnd":0,"comment":"..."}]';
+const ANNOTATIONS_EXAMPLE = '"annotations":[{"type":"strength","questionNumber":1,"criterionCode":"","lineStart":0,"lineEnd":0,"comment":"..."}]';
 
 export function buildTextGradingPrompt(
+  programme: IBProgramme,
   courseworkType: CourseworkType,
   subject: string,
   level: string,
   ocrText: string
 ): string {
-  const criteria = getCriteria(courseworkType, subject);
+  const criteria = getCriteria(programme, courseworkType, subject);
   const { list, maxTotal, example } = criteriaBlock(criteria);
+  const isMyp = isMypCriteria(programme, courseworkType);
+  const unit = isMyp ? 'achievement level' : 'mark';
+  const scoringNote = isMyp
+    ? `These are MYP achievement LEVELS (whole numbers 0-${criteria[0]?.maxScore ?? 8} per criterion, not raw exam marks) - award the level whose descriptor best fits the work as a whole for that criterion, using your best judgement of where it sits against the strand of increasing quality the criterion represents.`
+    : `These are raw marks - award the mark for each criterion based on exactly what the answer demonstrates, the way an IB examiner would apply a markscheme.`;
 
   if (courseworkType === 'extended-essay' || courseworkType === 'tok') {
     const pieceLabel = courseworkType === 'extended-essay' ? 'IB Extended Essay' : 'IB TOK essay or exhibition commentary';
@@ -91,19 +98,24 @@ ${ocrText}
 
   const courseworkLabel =
     courseworkType === 'internal-assessment' ? 'Internal Assessment' : courseworkType === 'exam' ? 'exam' : 'external assessment';
+  const programmeLabel = programme === 'MYP' ? 'IB MYP' : 'IB DP';
+  // SL/HL is a DP-only concept - never mention it for MYP, which has no such split.
+  const levelSuffix = programme === 'MYP' ? '' : ` ${level}`;
 
-  return `You are an IB examiner's grading assistant reviewing a scanned student ${courseworkLabel} answer sheet for ${subject} ${level}.
+  return `You are an IB examiner's grading assistant reviewing a scanned student ${courseworkLabel} answer sheet for ${programmeLabel} ${subject}${levelSuffix}.
 
-The text below was extracted by a PaddleOCR pass over a scanned PDF of one student's handwritten or typed responses to an IB ${subject} ${level} ${courseworkLabel}. It is plain text, not an image — you cannot assess handwriting quality, only the symbolic content. The OCR text may contain recognition errors, garbled symbols, or misplaced line breaks; use your best judgement to reconstruct the intended meaning.
+The text below was extracted by a PaddleOCR pass over a scanned PDF of one student's handwritten or typed responses to an ${programmeLabel} ${subject}${levelSuffix} ${courseworkLabel}. It is plain text, not an image — you cannot assess handwriting quality, only the symbolic content. The OCR text may contain recognition errors, garbled symbols, or misplaced line breaks; use your best judgement to reconstruct the intended meaning.
 
 Grade using these ${subject} ${courseworkLabel} criteria for EVERY question (do not substitute criteria from a different subject or coursework type, and do not invent additional criteria):
 
 ${list}
 
+${scoringNote}
+
 Do the following, in order:
 1. Identify each distinct question/answer pair in the OCR text, in order.
 2. For each answer, write a 1-3 sentence summary of what the student wrote.
-3. For each question, score it against EACH of the ${criteria.length} criteria above individually (each out of its own maxScore shown above), with a short comment of 12 words or fewer per criterion explaining that specific score. Sum the criteria scores into the question's own score, and the criteria maxScores into the question's own maxScore (which will be ${maxTotal} per question, since the criteria above sum to that).
+3. For each question, ${isMyp ? 'assign' : 'score'} EACH of the ${criteria.length} criteria above individually (each out of its own maxScore shown above, as a ${unit}), with a short comment of 12 words or fewer per criterion explaining that specific ${unit}. Sum the criteria ${isMyp ? 'levels' : 'scores'} into the question's own score, and the criteria maxScores into the question's own maxScore (which will be ${maxTotal} per question, since the criteria above sum to that).
 4. ${EVIDENCE_INSTRUCTION}
 5. Write a single overall feedback comment for the question (12 words or fewer) summarizing across all criteria.
 6. Write 2-4 general feedback bullets for the whole sheet, each 14 words or fewer, grounded in the criteria above.

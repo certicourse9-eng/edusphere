@@ -1,6 +1,6 @@
-import type { StudentFile } from './types';
+import type { GradeBoundary, StudentFile } from './types';
 import { FILE_STATUS_LABELS } from './types';
-import { approxIbGrade } from './gradeBands';
+import { computeGradeFromBoundaries } from './gradeBoundaries';
 
 function csvEscape(value: string): string {
   if (/[",\r\n]/.test(value)) {
@@ -9,16 +9,18 @@ function csvEscape(value: string): string {
   return value;
 }
 
-export function buildCsv(files: StudentFile[]): string {
+export function buildCsv(files: StudentFile[], gradeBoundaries: GradeBoundary[] = []): string {
   const header = [
     'Student ID',
     'Filename',
     'Status',
     'Detected Subject',
     'Question Count',
-    'Total Score',
+    'AI Score',
+    'Teacher-Approved Score',
     'Max Score',
-    'Approx IB Grade',
+    'Percentage',
+    'IB Grade',
     'Review Reason',
     'Teacher Feedback'
   ];
@@ -27,7 +29,10 @@ export function buildCsv(files: StudentFile[]): string {
     .filter(f => f.result !== null)
     .map(f => {
       const r = f.result!;
-      const grade = approxIbGrade(r.totalScore, r.maxTotal);
+      const isOverridden = typeof f.teacherOverrideScore === 'number';
+      const effectiveScore = isOverridden ? (f.teacherOverrideScore as number) : r.totalScore;
+      const pct = r.maxTotal > 0 ? effectiveScore / r.maxTotal : 0;
+      const grade = computeGradeFromBoundaries(pct, gradeBoundaries);
       return [
         f.studentId,
         f.fileName,
@@ -35,8 +40,10 @@ export function buildCsv(files: StudentFile[]): string {
         r.detectedSubject,
         String(r.questions.length),
         String(r.totalScore),
+        isOverridden ? String(f.teacherOverrideScore) : '',
         String(r.maxTotal),
-        String(grade),
+        `${Math.round(pct * 100)}%`,
+        grade !== null ? String(grade) : '',
         f.reviewReason || '',
         f.teacherFeedback || ''
       ]

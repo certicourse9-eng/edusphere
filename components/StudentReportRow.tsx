@@ -6,16 +6,27 @@ import AnnotatedPageView from './AnnotatedPageView';
 import ScoreRing from './ScoreRing';
 import SubjectIcon from './SubjectIcon';
 import TeacherFeedbackBox from './TeacherFeedbackBox';
+import TeacherScoreOverride from './TeacherScoreOverride';
 import WhyThisMarkPanel from './WhyThisMarkPanel';
-import { getBand, BAND_LABELS, BAND_COLORS, approxIbGrade } from '@/lib/gradeBands';
-import type { GradedQuestion, StudentFile } from '@/lib/types';
+import { getBand, BAND_LABELS, BAND_COLORS } from '@/lib/gradeBands';
+import { computeGradeFromBoundaries } from '@/lib/gradeBoundaries';
+import type { GradeBoundary, GradedQuestion, IBProgramme, StudentFile } from '@/lib/types';
 
 interface StudentReportRowProps {
   file: StudentFile;
   onTeacherFeedbackChange: (text: string) => void;
+  onTeacherOverrideScoreChange: (score: number | null) => void;
+  gradeBoundaries: GradeBoundary[];
+  programme: IBProgramme;
 }
 
-export default function StudentReportRow({ file, onTeacherFeedbackChange }: StudentReportRowProps) {
+export default function StudentReportRow({
+  file,
+  onTeacherFeedbackChange,
+  onTeacherOverrideScoreChange,
+  gradeBoundaries,
+  programme
+}: StudentReportRowProps) {
   const [tab, setTab] = useState<'overview' | 'questions' | 'annotated' | 'pdf' | 'ocr'>('overview');
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [whyMarkQuestion, setWhyMarkQuestion] = useState<GradedQuestion | null>(null);
@@ -29,9 +40,13 @@ export default function StudentReportRow({ file, onTeacherFeedbackChange }: Stud
   const r = file.result;
   if (!r) return null;
 
-  const band = getBand(r.totalScore, r.maxTotal);
-  const pct = r.maxTotal > 0 ? r.totalScore / r.maxTotal : 0;
-  const grade = approxIbGrade(r.totalScore, r.maxTotal);
+  const isOverridden = typeof file.teacherOverrideScore === 'number';
+  const effectiveScore = isOverridden ? (file.teacherOverrideScore as number) : r.totalScore;
+  const band = getBand(effectiveScore, r.maxTotal);
+  const pct = r.maxTotal > 0 ? effectiveScore / r.maxTotal : 0;
+  const grade = computeGradeFromBoundaries(pct, gradeBoundaries);
+  const gradeScaleLabel = programme === 'MYP' ? 'MYP subject grade' : 'IB course grade';
+  const scoreUnitLabel = programme === 'MYP' ? 'achievement level' : 'marks';
 
   return (
     <div className={`${styles.report} fade-in`}>
@@ -59,14 +74,19 @@ export default function StudentReportRow({ file, onTeacherFeedbackChange }: Stud
 
       {tab === 'overview' && (
         <div className={styles.overview}>
-          <ScoreRing score={r.totalScore} maxScore={r.maxTotal} band={band} />
+          <ScoreRing score={effectiveScore} maxScore={r.maxTotal} band={band} />
           <div className={styles.overviewMeta}>
             <p className={styles.subjectLine}>
               <SubjectIcon subject={r.detectedSubject} />
               Detected subject: <strong>{r.detectedSubject}</strong>
             </p>
             <p className={styles.gradeLine}>
-              Approx. IB grade: <strong>{grade}</strong> <span className={styles.approxNote}>(approx.)</span>
+              {gradeScaleLabel}:{' '}
+              {grade !== null ? (
+                <strong>{grade}</strong>
+              ) : (
+                <span className={styles.approxNote}>not available — enter grade boundaries above to see this</span>
+              )}
             </p>
             <div className={styles.scaleBar}>
               <div className={styles.scaleTrack}>
@@ -93,6 +113,12 @@ export default function StudentReportRow({ file, onTeacherFeedbackChange }: Stud
             {typeof file.ocrConfidence === 'number' && (
               <p className={styles.confidenceNote}>OCR confidence: {Math.round(file.ocrConfidence * 100)}%</p>
             )}
+            <TeacherScoreOverride
+              aiScore={r.totalScore}
+              maxScore={r.maxTotal}
+              overrideScore={file.teacherOverrideScore}
+              onChange={onTeacherOverrideScoreChange}
+            />
             <TeacherFeedbackBox initialValue={file.teacherFeedback} onSave={onTeacherFeedbackChange} />
           </div>
         </div>
@@ -122,7 +148,7 @@ export default function StudentReportRow({ file, onTeacherFeedbackChange }: Stud
                     onClick={() => setWhyMarkQuestion(q)}
                     title="Why this mark?"
                   >
-                    {q.score}/{q.maxScore} <span aria-hidden="true">ⓘ</span>
+                    {q.score}/{q.maxScore} {scoreUnitLabel} <span aria-hidden="true">ⓘ</span>
                   </button>
                 </p>
                 {q.criteria.length > 0 && (
@@ -149,7 +175,16 @@ export default function StudentReportRow({ file, onTeacherFeedbackChange }: Stud
       )}
 
       {tab === 'annotated' && file.ocrPages && (
-        <AnnotatedPageView pages={file.ocrPages} annotations={r.annotations} />
+        <AnnotatedPageView
+          pages={file.ocrPages}
+          annotations={r.annotations}
+          questions={r.questions}
+          totalScore={r.totalScore}
+          maxTotal={r.maxTotal}
+          teacherOverrideScore={file.teacherOverrideScore}
+          gradeBoundaries={gradeBoundaries}
+          programme={programme}
+        />
       )}
 
       {tab === 'pdf' && (

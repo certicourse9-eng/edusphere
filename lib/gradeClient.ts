@@ -1,4 +1,4 @@
-import type { CourseworkType, FileStatus, GradingResult, Level, OcrPage } from './types';
+import type { CourseworkType, FileStatus, GradingResult, IBProgramme, Level, OcrPage } from './types';
 
 export function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -56,6 +56,7 @@ export function buildLineMarkedText(pages: OcrPage[]): string {
 
 export async function gradeText(
   markedText: string,
+  programme: IBProgramme,
   courseworkType: CourseworkType,
   subject: string,
   level: Level
@@ -65,7 +66,7 @@ export async function gradeText(
     resp = await fetch('/api/grade', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ocrText: markedText, courseworkType, subject, level })
+      body: JSON.stringify({ ocrText: markedText, programme, courseworkType, subject, level })
     });
   } catch (err) {
     throw new Error(`Could not reach the grading server: ${(err as Error).message}`);
@@ -88,6 +89,7 @@ export interface GradeFileOutcome {
 
 export async function gradeFile(
   file: File,
+  programme: IBProgramme,
   courseworkType: CourseworkType,
   subject: string,
   level: Level,
@@ -99,6 +101,6 @@ export async function gradeFile(
   onStatusChange?.('ocr-completed');
   const markedText = buildLineMarkedText(pages);
   onStatusChange?.('evaluating');
-  const result = await gradeText(markedText, courseworkType, subject, level);
+  const result = await gradeText(markedText, programme, courseworkType, subject, level);
   return { result, ocrText: text, ocrPages: pages, ocrConfidence };
 }
