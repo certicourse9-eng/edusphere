@@ -7,6 +7,15 @@ const AUTH_ERROR_COOLDOWN_MS = 60 * 60 * 1000;
 const NETWORK_ERROR_COOLDOWN_MS = 10_000;
 const MAX_LOG_EVENTS = 300;
 const MAX_ACCOUNTS_PER_PROVIDER = 6;
+/** A rate limit this short is almost always a per-minute token budget that's about to
+ *  refill, not a real outage - waiting it out and retrying the SAME account beats jumping
+ *  straight to cooldown+failover, especially with only one account configured (where
+ *  "failover" would otherwise mean "fail immediately with nowhere else to go"). */
+const SHORT_RATE_LIMIT_WAIT_MS = 12_000;
+
+function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 /** In-memory only, by design - this app has no database (an explicit earlier decision).
  *  State here lives for as long as this server process/instance stays warm; a cold start
@@ -172,6 +181,23 @@ export async function callWithFailover(prompt: string, jsonMode: boolean): Promi
       recordSuccess(account, Date.now() - start);
       return { text, accountId: account.accountId, label: account.label };
     } catch (err) {
+      // A short rate-limit wait is worth riding out on the SAME account before treating it
+      // as a failure at all - jumping straight to cooldown+failover here would mean "only
+      // one account configured" always fails outright on a routine per-minute limit instead
+      // of just waiting a few seconds, which is what a teacher would do by hand anyway.
+      if (err instanceof ProviderCallError && err.errorType === 'rate-limit' && err.retryAfterSeconds !== null && err.retryAfterSeconds * 1000 <= SHORT_RATE_LIMIT_WAIT_MS) {
+        await sleep(err.retryAfterSeconds * 1000);
+        const retryStart = Date.now();
+        try {
+          const text = await callOpenAiCompatible(account, prompt, jsonMode);
+          recordSuccess(account, Date.now() - retryStart);
+          return { text, accountId: account.accountId, label: account.label };
+        } catch (retryErr) {
+          recordFailure(account, retryErr, Date.now() - retryStart);
+          attempts.push(`${account.label}: ${retryErr instanceof Error ? retryErr.message : String(retryErr)} (after waiting ${err.retryAfterSeconds.toFixed(1)}s and retrying once)`);
+          continue;
+        }
+      }
       recordFailure(account, err, Date.now() - start);
       attempts.push(`${account.label}: ${err instanceof Error ? err.message : String(err)}`);
     }
