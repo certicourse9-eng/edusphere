@@ -1,8 +1,24 @@
 import { ProviderCallError, type AccountConfig } from '../types';
 
 interface ChatCompletionResponse {
-  choices?: { message?: { content?: string } }[];
+  choices?: { message?: { content?: string }; finish_reason?: string }[];
   error?: { message?: string; type?: string; code?: string };
+}
+
+/** This account's tier caps combined prompt+completion tokens at 8000 per request (found
+ *  empirically from live rate-limit errors). A fixed completion budget either wastes headroom
+ *  on short prompts or truncates the JSON mid-object on long/detailed ones (many
+ *  questions x many criteria x evidence/missing text easily exceeds a flat 4000). Scale the
+ *  completion budget to whatever's left after a rough estimate of the prompt's own size. */
+const COMBINED_TOKEN_CAP = 8000;
+const RESPONSE_SAFETY_MARGIN = 200;
+const MIN_COMPLETION_TOKENS = 1500;
+const MAX_COMPLETION_TOKENS = 6500;
+
+function estimateMaxTokens(prompt: string): number {
+  const estimatedPromptTokens = Math.ceil(prompt.length / 4);
+  const available = COMBINED_TOKEN_CAP - estimatedPromptTokens - RESPONSE_SAFETY_MARGIN;
+  return Math.max(MIN_COMPLETION_TOKENS, Math.min(MAX_COMPLETION_TOKENS, available));
 }
 
 function parseRetryAfterSeconds(resp: Response, message: string): number | null {
@@ -33,9 +49,10 @@ export async function callOpenAiCompatible(account: AccountConfig, prompt: strin
       body: JSON.stringify({
         model: account.model,
         messages: [{ role: 'user', content: prompt }],
-        // Keep completions bounded so a long paper can't silently truncate mid-JSON, and so
-        // a single request doesn't blow past a free-tier account's combined token budget.
-        ...(jsonMode ? { response_format: { type: 'json_object' }, max_tokens: 4000 } : {})
+        // Bounded so a single request doesn't blow past this tier's combined token budget,
+        // but scaled to the prompt so a detailed paper still has room to finish its JSON
+        // instead of getting cut off mid-object (see estimateMaxTokens above).
+        ...(jsonMode ? { response_format: { type: 'json_object' }, max_tokens: estimateMaxTokens(prompt) } : {})
       })
     });
   } catch (err) {
@@ -61,9 +78,16 @@ export async function callOpenAiCompatible(account: AccountConfig, prompt: strin
     throw new ProviderCallError(rawMessage, errorType, errorType === 'rate-limit' ? parseRetryAfterSeconds(resp, rawMessage) : null);
   }
 
-  const text = data.choices?.[0]?.message?.content;
+  const choice = data.choices?.[0];
+  const text = choice?.message?.content;
   if (!text) {
     throw new ProviderCallError(`${account.label} response had no text content`, 'other');
+  }
+  if (choice?.finish_reason === 'length') {
+    throw new ProviderCallError(
+      `${account.label}: the response was cut off before it finished (too much output for this paper's length/detail). Try re-grading it, or if it keeps happening, this paper may need to be split into a shorter excerpt.`,
+      'other'
+    );
   }
   return text;
 }

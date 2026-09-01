@@ -83,7 +83,7 @@ export function parseGradingResponse(rawText: string, detectedSubject: string): 
     !Array.isArray((parsed as Partial<GradingResult>).questions) ||
     !Array.isArray((parsed as Partial<GradingResult>).generalFeedback)
   ) {
-    throw new Error("Could not parse a valid grading JSON object from Claude's response");
+    throw new Error('Could not parse a valid grading JSON object from the AI\'s response');
   }
 
   const p = parsed as GradingResult;
