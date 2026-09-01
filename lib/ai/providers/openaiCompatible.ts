@@ -47,6 +47,20 @@ function classifyError(resp: Response, message: string): 'rate-limit' | 'auth' |
   return 'other';
 }
 
+/** Groq and OpenAI's own models reliably support the OpenAI `response_format: json_object`
+ *  param. OpenRouter fans out to many different underlying models/providers whose support
+ *  for it varies (and its free-tier lineup rotates), so requiring it there risks silently
+ *  breaking a fallback the moment its current free model doesn't support the param - as
+ *  happened with nvidia/nemotron-3.5-lightning:free, which returned empty content rather
+ *  than an error when sent a parameter it doesn't recognize. The grading prompt already
+ *  instructs the model to respond with pure JSON, and parseGradingResponse already falls
+ *  back to extracting a JSON object from prose/fences when strict mode isn't used - so
+ *  skipping this param for OpenRouter trades a little strictness for actually working
+ *  across whichever model happens to be free there. */
+function supportsJsonResponseFormat(provider: AccountConfig['provider']): boolean {
+  return provider === 'groq' || provider === 'openai';
+}
+
 /** Calls any OpenAI-compatible /chat/completions endpoint (Groq, OpenAI itself, and most
  *  other hosted-inference providers share this exact request/response shape). One adapter
  *  serves every such provider - only baseUrl/apiKey/model differ per account. */
@@ -77,7 +91,9 @@ export async function callOpenAiCompatible(account: AccountConfig, prompt: strin
       body: JSON.stringify({
         model: account.model,
         messages: [{ role: 'user', content: prompt }],
-        ...(jsonMode ? { response_format: { type: 'json_object' }, max_tokens: maxTokens } : {})
+        ...(jsonMode
+          ? { max_tokens: maxTokens, ...(supportsJsonResponseFormat(account.provider) ? { response_format: { type: 'json_object' } } : {}) }
+          : {})
       })
     });
   } catch (err) {
