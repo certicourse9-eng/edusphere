@@ -15,7 +15,8 @@ interface ChatCompletionResponse {
 const COMBINED_TOKEN_CAP: Record<ProviderId, number> = {
   groq: 8000,
   openai: 100_000,
-  openrouter: 100_000
+  openrouter: 100_000,
+  gemini: 100_000
 };
 const RESPONSE_SAFETY_MARGIN = 200;
 const MIN_COMPLETION_TOKENS = 1500;

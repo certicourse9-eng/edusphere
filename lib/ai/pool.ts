@@ -30,6 +30,9 @@ const usageLog: UsageEvent[] = [];
 function envBaseUrl(provider: ProviderId): string {
   if (provider === 'groq') return 'https://api.groq.com/openai/v1';
   if (provider === 'openrouter') return 'https://openrouter.ai/api/v1';
+  // Google's own OpenAI-compatible endpoint - same request/response shape as every other
+  // account here, so it plugs into the shared adapter with no special-casing.
+  if (provider === 'gemini') return 'https://generativelanguage.googleapis.com/v1beta/openai';
   return 'https://api.openai.com/v1';
 }
 
@@ -44,11 +47,19 @@ function envModel(provider: ProviderId): string {
   // single request. Override with OPENROUTER_MODEL if OpenRouter's free lineup changes
   // again or you'd rather point this at a paid model.
   if (provider === 'openrouter') return process.env.OPENROUTER_MODEL || 'nvidia/nemotron-3.5-lightning:free';
+  if (provider === 'gemini') return process.env.GEMINI_MODEL || 'gemini-2.5-flash';
   return process.env.OPENAI_MODEL || 'gpt-4o-mini';
 }
 
 function envKeyName(provider: ProviderId, index: number): string {
-  const base = provider === 'groq' ? 'GROQ_API_KEY' : provider === 'openrouter' ? 'OPENROUTER_API_KEY' : 'OPENAI_API_KEY';
+  const base =
+    provider === 'groq'
+      ? 'GROQ_API_KEY'
+      : provider === 'openrouter'
+        ? 'OPENROUTER_API_KEY'
+        : provider === 'gemini'
+          ? 'GEMINI_API_KEY'
+          : 'OPENAI_API_KEY';
   return index === 1 ? base : `${base}_${index}`;
 }
 
@@ -74,17 +85,22 @@ function loadProviderAccounts(provider: ProviderId, priorityOffset: number): Acc
   return accounts;
 }
 
-/** Fixed failover order: every Groq account (in declared order), then every OpenRouter
- *  account, then every OpenAI account - there's no live drag-to-reorder UI since persisting
- *  a custom order needs a database. OpenRouter sits before OpenAI because it's also a
- *  free-tier option (matching Groq), and its much higher per-request token limit makes it
- *  the natural fallback for a paper too long for Groq's cap. To change priority, reorder
- *  which env vars you set, or add a provider by extending PROVIDER_LABELS/envBaseUrl/envModel
- *  and giving it its own priority band below. */
+/** Fixed failover order: Groq, then Gemini, then OpenRouter, then OpenAI (each provider's
+ *  own accounts tried in declared order) - there's no live drag-to-reorder UI since
+ *  persisting a custom order needs a database. Gemini and OpenRouter both sit before OpenAI
+ *  because they're free-tier options (matching Groq) with a much higher per-request token
+ *  limit, making them the natural fallback for a paper too long for Groq's cap. Gemini goes
+ *  first between the two - it's a known, stable model, vs. OpenRouter's free lineup which
+ *  rotates over time (see envModel). To change priority, reorder which env vars you set, or
+ *  add a provider by extending PROVIDER_LABELS/envBaseUrl/envModel and giving it its own
+ *  priority band below. */
 export function loadAllAccounts(): AccountConfig[] {
-  return [...loadProviderAccounts('groq', 0), ...loadProviderAccounts('openrouter', 50), ...loadProviderAccounts('openai', 100)].sort(
-    (a, b) => a.priority - b.priority
-  );
+  return [
+    ...loadProviderAccounts('groq', 0),
+    ...loadProviderAccounts('gemini', 25),
+    ...loadProviderAccounts('openrouter', 50),
+    ...loadProviderAccounts('openai', 100)
+  ].sort((a, b) => a.priority - b.priority);
 }
 
 function ensureHealth(accountId: string): AccountHealth {
