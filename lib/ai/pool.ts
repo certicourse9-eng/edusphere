@@ -35,11 +35,15 @@ function envBaseUrl(provider: ProviderId): string {
 
 function envModel(provider: ProviderId): string {
   if (provider === 'groq') return process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
-  // Free-tier variant by default - this project otherwise runs entirely on free-tier
-  // accounts (Groq), and OpenRouter's own hosted Llama 3.3 70B has a much higher
-  // per-request token limit than Groq's, making it a good high-headroom fallback for
-  // papers whose OCR text is too long for Groq's request cap.
-  if (provider === 'openrouter') return process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct:free';
+  // Free-tier by default - this project otherwise runs entirely on free-tier accounts
+  // (Groq). OpenRouter has progressively dropped free access to the well-known models
+  // (Llama, Gemini, etc. no longer have a free variant there), so this uses one of the
+  // few that's still genuinely free: Nemotron 3.5 Lightning, with a 1,000,000-token
+  // context window - vastly more than Groq's 8000-token combined cap, making this the
+  // fallback for exactly the case Groq can't handle: a paper too long/text-heavy for a
+  // single request. Override with OPENROUTER_MODEL if OpenRouter's free lineup changes
+  // again or you'd rather point this at a paid model.
+  if (provider === 'openrouter') return process.env.OPENROUTER_MODEL || 'nvidia/nemotron-3.5-lightning:free';
   return process.env.OPENAI_MODEL || 'gpt-4o-mini';
 }
 
