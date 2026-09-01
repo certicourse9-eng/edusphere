@@ -12,6 +12,7 @@ import WhyThisMarkPanel from './WhyThisMarkPanel';
 import { getBand, BAND_LABELS, BAND_COLORS } from '@/lib/gradeBands';
 import { computeGradeFromBoundaries } from '@/lib/gradeBoundaries';
 import { getEffectiveTotalScore, isScoreOverridden, getEffectiveQuestionScore } from '@/lib/effectiveScore';
+import { downloadCorrectedPaper } from '@/lib/correctedPaperPdf';
 import type { GradeBoundary, GradedQuestion, IBProgramme, StudentFile } from '@/lib/types';
 
 interface StudentReportRowProps {
@@ -34,6 +35,8 @@ export default function StudentReportRow({
   const [tab, setTab] = useState<'overview' | 'questions' | 'annotated' | 'pdf' | 'ocr'>('overview');
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [whyMarkQuestion, setWhyMarkQuestion] = useState<GradedQuestion | null>(null);
+  const [downloadingPaper, setDownloadingPaper] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   useEffect(() => {
     const url = URL.createObjectURL(file.file);
@@ -51,28 +54,48 @@ export default function StudentReportRow({
   const gradeScaleLabel = programme === 'MYP' ? 'MYP subject grade' : 'IB course grade';
   const scoreUnitLabel = programme === 'MYP' ? 'achievement level' : 'marks';
 
+  const handleDownloadCorrectedPaper = async () => {
+    setDownloadingPaper(true);
+    setDownloadError(null);
+    try {
+      await downloadCorrectedPaper(file, gradeBoundaries, programme);
+    } catch (err) {
+      setDownloadError((err as Error).message);
+    } finally {
+      setDownloadingPaper(false);
+    }
+  };
+
   return (
     <div className={`${styles.report} fade-in`}>
-      <div className={styles.tabs}>
-        <button className={tab === 'overview' ? styles.activeTab : ''} onClick={() => setTab('overview')}>
-          Overview
-        </button>
-        <button className={tab === 'questions' ? styles.activeTab : ''} onClick={() => setTab('questions')}>
-          Questions
-        </button>
-        {file.ocrPages && file.ocrPages.length > 0 && (
-          <button className={tab === 'annotated' ? styles.activeTab : ''} onClick={() => setTab('annotated')}>
-            Annotated paper
+      <div className={styles.headerRow}>
+        <div className={styles.tabs}>
+          <button className={tab === 'overview' ? styles.activeTab : ''} onClick={() => setTab('overview')}>
+            Overview
           </button>
-        )}
-        <button className={tab === 'pdf' ? styles.activeTab : ''} onClick={() => setTab('pdf')}>
-          Original PDF
-        </button>
-        {file.ocrText && (
-          <button className={tab === 'ocr' ? styles.activeTab : ''} onClick={() => setTab('ocr')}>
-            OCR text
+          <button className={tab === 'questions' ? styles.activeTab : ''} onClick={() => setTab('questions')}>
+            Questions
           </button>
-        )}
+          {file.ocrPages && file.ocrPages.length > 0 && (
+            <button className={tab === 'annotated' ? styles.activeTab : ''} onClick={() => setTab('annotated')}>
+              Annotated paper
+            </button>
+          )}
+          <button className={tab === 'pdf' ? styles.activeTab : ''} onClick={() => setTab('pdf')}>
+            Original PDF
+          </button>
+          {file.ocrText && (
+            <button className={tab === 'ocr' ? styles.activeTab : ''} onClick={() => setTab('ocr')}>
+              OCR text
+            </button>
+          )}
+        </div>
+        <div className={styles.downloadCol}>
+          <button type="button" className={styles.downloadBtn} onClick={handleDownloadCorrectedPaper} disabled={downloadingPaper}>
+            {downloadingPaper ? 'Preparing PDF…' : '⬇ Download corrected paper'}
+          </button>
+          {downloadError && <p className={styles.downloadError}>{downloadError}</p>}
+        </div>
       </div>
 
       {tab === 'overview' && (
