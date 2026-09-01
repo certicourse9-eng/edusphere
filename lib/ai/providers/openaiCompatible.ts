@@ -103,7 +103,13 @@ export async function callOpenAiCompatible(account: AccountConfig, prompt: strin
 
   let data: ChatCompletionResponse;
   try {
-    data = await resp.json();
+    const parsed: unknown = await resp.json();
+    // Most providers return a bare error object (Groq/OpenAI/OpenRouter: {"error": {...}}),
+    // but Gemini's OpenAI-compatible endpoint wraps it in a one-element array
+    // ([{"error": {...}}]) - without unwrapping that, data.error below is always
+    // undefined for Gemini and every real error message collapses into the generic
+    // "error (status ###)" fallback.
+    data = (Array.isArray(parsed) ? parsed[0] : parsed) as ChatCompletionResponse;
   } catch {
     throw new ProviderCallError(`returned a non-JSON response (status ${resp.status})`, 'other');
   }
