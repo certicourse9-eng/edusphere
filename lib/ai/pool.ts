@@ -28,16 +28,23 @@ const disabledSet = new Set<string>();
 const usageLog: UsageEvent[] = [];
 
 function envBaseUrl(provider: ProviderId): string {
-  return provider === 'groq' ? 'https://api.groq.com/openai/v1' : 'https://api.openai.com/v1';
+  if (provider === 'groq') return 'https://api.groq.com/openai/v1';
+  if (provider === 'openrouter') return 'https://openrouter.ai/api/v1';
+  return 'https://api.openai.com/v1';
 }
 
 function envModel(provider: ProviderId): string {
   if (provider === 'groq') return process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
+  // Free-tier variant by default - this project otherwise runs entirely on free-tier
+  // accounts (Groq), and OpenRouter's own hosted Llama 3.3 70B has a much higher
+  // per-request token limit than Groq's, making it a good high-headroom fallback for
+  // papers whose OCR text is too long for Groq's request cap.
+  if (provider === 'openrouter') return process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct:free';
   return process.env.OPENAI_MODEL || 'gpt-4o-mini';
 }
 
 function envKeyName(provider: ProviderId, index: number): string {
-  const base = provider === 'groq' ? 'GROQ_API_KEY' : 'OPENAI_API_KEY';
+  const base = provider === 'groq' ? 'GROQ_API_KEY' : provider === 'openrouter' ? 'OPENROUTER_API_KEY' : 'OPENAI_API_KEY';
   return index === 1 ? base : `${base}_${index}`;
 }
 
@@ -63,12 +70,17 @@ function loadProviderAccounts(provider: ProviderId, priorityOffset: number): Acc
   return accounts;
 }
 
-/** Fixed failover order: every Groq account (in declared order), then every OpenAI account -
- *  there's no live drag-to-reorder UI since persisting a custom order needs a database. To
- *  change priority, reorder which env vars you set, or add a provider between these two by
- *  extending PROVIDER_LABELS/envBaseUrl/envModel and giving it its own priority band below. */
+/** Fixed failover order: every Groq account (in declared order), then every OpenRouter
+ *  account, then every OpenAI account - there's no live drag-to-reorder UI since persisting
+ *  a custom order needs a database. OpenRouter sits before OpenAI because it's also a
+ *  free-tier option (matching Groq), and its much higher per-request token limit makes it
+ *  the natural fallback for a paper too long for Groq's cap. To change priority, reorder
+ *  which env vars you set, or add a provider by extending PROVIDER_LABELS/envBaseUrl/envModel
+ *  and giving it its own priority band below. */
 export function loadAllAccounts(): AccountConfig[] {
-  return [...loadProviderAccounts('groq', 0), ...loadProviderAccounts('openai', 100)].sort((a, b) => a.priority - b.priority);
+  return [...loadProviderAccounts('groq', 0), ...loadProviderAccounts('openrouter', 50), ...loadProviderAccounts('openai', 100)].sort(
+    (a, b) => a.priority - b.priority
+  );
 }
 
 function ensureHealth(accountId: string): AccountHealth {
