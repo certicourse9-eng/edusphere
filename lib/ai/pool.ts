@@ -10,8 +10,12 @@ const MAX_ACCOUNTS_PER_PROVIDER = 6;
 /** A rate limit this short is almost always a per-minute token budget that's about to
  *  refill, not a real outage - waiting it out and retrying the SAME account beats jumping
  *  straight to cooldown+failover, especially with only one account configured (where
- *  "failover" would otherwise mean "fail immediately with nowhere else to go"). */
-const SHORT_RATE_LIMIT_WAIT_MS = 12_000;
+ *  "failover" would otherwise mean "fail immediately with nowhere else to go"). A large
+ *  paper's request size can land close enough to the per-minute cap that the provider's
+ *  own suggested wait is 12-15s - seen live at 13.2s, just over the previous 12s
+ *  threshold, which meant an easily-recoverable near-miss failed over instead of just
+ *  waiting the extra second. 20s comfortably covers that case with room to spare. */
+const SHORT_RATE_LIMIT_WAIT_MS = 20_000;
 
 function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
