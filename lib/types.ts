@@ -129,8 +129,14 @@ export interface StudentFile {
   /** Set when status is 'needs-review' or 'failed', explaining why. */
   reviewReason?: string;
   /** The teacher's own final total score, kept entirely separate from the AI's result.totalScore.
-   *  Null means the teacher hasn't overridden anything - the AI score stands as-is pending review. */
+   *  Null means the teacher hasn't overridden anything - the AI score stands as-is pending review.
+   *  Mutually exclusive with teacherOverrideQuestionScores - setting one clears the other, so
+   *  there's always exactly one unambiguous source for "the final score". */
   teacherOverrideScore?: number | null;
+  /** Per-question teacher overrides, keyed by GradedQuestion.number. Lets a teacher correct one
+   *  question's mark and have the total follow, instead of only being able to override the whole
+   *  paper's total directly. Mutually exclusive with teacherOverrideScore. */
+  teacherOverrideQuestionScores?: Record<number, number>;
   /** The programme this file was actually graded under - NOT the class setup's current
    *  programme value, which can change after this file is graded if the teacher switches
    *  programme for a later upload in the same session. Grade-scale labels (MYP subject grade

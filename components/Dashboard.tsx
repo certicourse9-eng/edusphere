@@ -5,6 +5,7 @@ import styles from './Dashboard.module.css';
 import StudentReportRow from './StudentReportRow';
 import { getBand } from '@/lib/gradeBands';
 import { computeGradeFromBoundaries } from '@/lib/gradeBoundaries';
+import { getEffectiveTotalScore, isScoreOverridden } from '@/lib/effectiveScore';
 import { FILE_STATUS_LABELS, FINISHED_STATUSES } from '@/lib/types';
 import type { FileStatus, GradeBoundary, IBProgramme, StudentFile } from '@/lib/types';
 
@@ -33,6 +34,7 @@ interface DashboardProps {
   onTeacherFeedbackChange: (id: string, text: string) => void;
   onApprove: (id: string) => void;
   onTeacherOverrideScoreChange: (id: string, score: number | null) => void;
+  onTeacherOverrideQuestionScoreChange: (id: string, questionNumber: number, score: number | null) => void;
   onExport: () => void;
   exportDisabled: boolean;
   gradeBoundaries: GradeBoundary[];
@@ -44,6 +46,7 @@ export default function Dashboard({
   onTeacherFeedbackChange,
   onApprove,
   onTeacherOverrideScoreChange,
+  onTeacherOverrideQuestionScoreChange,
   onExport,
   exportDisabled,
   gradeBoundaries,
@@ -57,7 +60,7 @@ export default function Dashboard({
 
   const finished = files.filter(f => FINISHED_STATUSES.includes(f.status));
   const questionsAssessed = finished.reduce((sum, f) => sum + (f.result?.questions.length ?? 0), 0);
-  const totalScore = finished.reduce((sum, f) => sum + (f.result?.totalScore ?? 0), 0);
+  const totalScore = finished.reduce((sum, f) => sum + (f.result ? getEffectiveTotalScore(f) : 0), 0);
   const totalMax = finished.reduce((sum, f) => sum + (f.result?.maxTotal ?? 0), 0);
   const classAverage =
     finished.length > 0 ? `${(totalScore / finished.length).toFixed(1)} / ${(totalMax / finished.length).toFixed(0)}` : '—';
@@ -149,8 +152,8 @@ export default function Dashboard({
                     <td>
                       {r ? (
                         (() => {
-                          const overridden = typeof f.teacherOverrideScore === 'number';
-                          const effectiveScore = overridden ? (f.teacherOverrideScore as number) : r.totalScore;
+                          const overridden = isScoreOverridden(f);
+                          const effectiveScore = getEffectiveTotalScore(f);
                           const pct = r.maxTotal > 0 ? effectiveScore / r.maxTotal : 0;
                           const grade = computeGradeFromBoundaries(pct, gradeBoundaries);
                           return (
@@ -185,6 +188,9 @@ export default function Dashboard({
                           file={f}
                           onTeacherFeedbackChange={text => onTeacherFeedbackChange(f.id, text)}
                           onTeacherOverrideScoreChange={score => onTeacherOverrideScoreChange(f.id, score)}
+                          onTeacherOverrideQuestionScoreChange={(questionNumber, score) =>
+                            onTeacherOverrideQuestionScoreChange(f.id, questionNumber, score)
+                          }
                           gradeBoundaries={gradeBoundaries}
                           programme={f.programme ?? programme}
                         />

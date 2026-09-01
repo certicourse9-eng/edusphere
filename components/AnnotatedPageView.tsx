@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import styles from './AnnotatedPageView.module.css';
 import { ANNOTATION_TYPE_LABELS } from '@/lib/types';
 import { computeGradeFromBoundaries } from '@/lib/gradeBoundaries';
+import { computeEffectiveScoreFromParts } from '@/lib/effectiveScore';
 import type { Annotation, GradeBoundary, GradedQuestion, IBProgramme, OcrPage } from '@/lib/types';
 
 interface AnnotatedPageViewProps {
@@ -13,6 +14,7 @@ interface AnnotatedPageViewProps {
   totalScore: number;
   maxTotal: number;
   teacherOverrideScore?: number | null;
+  teacherOverrideQuestionScores?: Record<number, number>;
   gradeBoundaries: GradeBoundary[];
   programme: IBProgramme;
 }
@@ -130,6 +132,7 @@ export default function AnnotatedPageView({
   totalScore,
   maxTotal,
   teacherOverrideScore,
+  teacherOverrideQuestionScores,
   gradeBoundaries,
   programme
 }: AnnotatedPageViewProps) {
@@ -137,8 +140,8 @@ export default function AnnotatedPageView({
   const [dims, setDims] = useState<Record<number, ImageDims>>({});
   const perPageMarks = useMemo(() => computePageMarks(pages, annotations, dims), [pages, annotations, dims]);
 
-  const isOverridden = typeof teacherOverrideScore === 'number';
-  const effectiveScore = isOverridden ? (teacherOverrideScore as number) : totalScore;
+  const effectiveScore = computeEffectiveScoreFromParts(totalScore, questions, teacherOverrideScore, teacherOverrideQuestionScores);
+  const isOverridden = effectiveScore !== totalScore;
   const pct = maxTotal > 0 ? effectiveScore / maxTotal : 0;
   const grade = computeGradeFromBoundaries(pct, gradeBoundaries);
   const gradeScaleLabel = programme === 'MYP' ? 'MYP subject grade' : 'IB course grade';

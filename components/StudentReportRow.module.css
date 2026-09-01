@@ -213,6 +213,12 @@
   color: var(--primary);
 }
 
+.overrideRow {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+
 .criteriaList {
   margin-top: 10px;
   padding-top: 10px;

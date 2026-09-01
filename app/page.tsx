@@ -30,6 +30,7 @@ export default function Page() {
     updateTeacherFeedback,
     approveFile,
     setTeacherOverrideScore,
+    setTeacherOverrideQuestionScore,
     runPipeline,
     handleExport,
     total,
@@ -101,6 +102,7 @@ export default function Page() {
         onTeacherFeedbackChange={updateTeacherFeedback}
         onApprove={approveFile}
         onTeacherOverrideScoreChange={setTeacherOverrideScore}
+        onTeacherOverrideQuestionScoreChange={setTeacherOverrideQuestionScore}
         onExport={handleExport}
         exportDisabled={finishedCount === 0}
         gradeBoundaries={gradeBoundaries}

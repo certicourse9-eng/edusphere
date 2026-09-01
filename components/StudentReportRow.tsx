@@ -7,15 +7,18 @@ import ScoreRing from './ScoreRing';
 import SubjectIcon from './SubjectIcon';
 import TeacherFeedbackBox from './TeacherFeedbackBox';
 import TeacherScoreOverride from './TeacherScoreOverride';
+import QuestionScoreOverride from './QuestionScoreOverride';
 import WhyThisMarkPanel from './WhyThisMarkPanel';
 import { getBand, BAND_LABELS, BAND_COLORS } from '@/lib/gradeBands';
 import { computeGradeFromBoundaries } from '@/lib/gradeBoundaries';
+import { getEffectiveTotalScore, isScoreOverridden, getEffectiveQuestionScore } from '@/lib/effectiveScore';
 import type { GradeBoundary, GradedQuestion, IBProgramme, StudentFile } from '@/lib/types';
 
 interface StudentReportRowProps {
   file: StudentFile;
   onTeacherFeedbackChange: (text: string) => void;
   onTeacherOverrideScoreChange: (score: number | null) => void;
+  onTeacherOverrideQuestionScoreChange: (questionNumber: number, score: number | null) => void;
   gradeBoundaries: GradeBoundary[];
   programme: IBProgramme;
 }
@@ -24,6 +27,7 @@ export default function StudentReportRow({
   file,
   onTeacherFeedbackChange,
   onTeacherOverrideScoreChange,
+  onTeacherOverrideQuestionScoreChange,
   gradeBoundaries,
   programme
 }: StudentReportRowProps) {
@@ -40,8 +44,7 @@ export default function StudentReportRow({
   const r = file.result;
   if (!r) return null;
 
-  const isOverridden = typeof file.teacherOverrideScore === 'number';
-  const effectiveScore = isOverridden ? (file.teacherOverrideScore as number) : r.totalScore;
+  const effectiveScore = getEffectiveTotalScore(file);
   const band = getBand(effectiveScore, r.maxTotal);
   const pct = r.maxTotal > 0 ? effectiveScore / r.maxTotal : 0;
   const grade = computeGradeFromBoundaries(pct, gradeBoundaries);
@@ -127,8 +130,9 @@ export default function StudentReportRow({
       {tab === 'questions' && (
         <div className={styles.questions}>
           {r.questions.map(q => {
-            const qBand = getBand(q.score, q.maxScore);
-            const qPct = q.maxScore > 0 ? (q.score / q.maxScore) * 100 : 0;
+            const qEffectiveScore = getEffectiveQuestionScore(file, q);
+            const qBand = getBand(qEffectiveScore, q.maxScore);
+            const qPct = q.maxScore > 0 ? (qEffectiveScore / q.maxScore) * 100 : 0;
             return (
               <div key={q.number} className={styles.questionCard}>
                 <div className={styles.questionHead}>
@@ -151,6 +155,14 @@ export default function StudentReportRow({
                     {q.score}/{q.maxScore} {scoreUnitLabel} <span aria-hidden="true">ⓘ</span>
                   </button>
                 </p>
+                <div className={styles.overrideRow}>
+                  <QuestionScoreOverride
+                    aiScore={q.score}
+                    maxScore={q.maxScore}
+                    overrideScore={file.teacherOverrideQuestionScores?.[q.number]}
+                    onChange={score => onTeacherOverrideQuestionScoreChange(q.number, score)}
+                  />
+                </div>
                 {q.criteria.length > 0 && (
                   <div className={styles.criteriaList}>
                     {q.criteria.map(c => (
@@ -182,6 +194,7 @@ export default function StudentReportRow({
           totalScore={r.totalScore}
           maxTotal={r.maxTotal}
           teacherOverrideScore={file.teacherOverrideScore}
+          teacherOverrideQuestionScores={file.teacherOverrideQuestionScores}
           gradeBoundaries={gradeBoundaries}
           programme={programme}
         />

@@ -1,6 +1,7 @@
 import type { GradeBoundary, StudentFile } from './types';
 import { FILE_STATUS_LABELS } from './types';
 import { computeGradeFromBoundaries } from './gradeBoundaries';
+import { getEffectiveTotalScore, isScoreOverridden } from './effectiveScore';
 
 function csvEscape(value: string): string {
   if (/[",\r\n]/.test(value)) {
@@ -29,8 +30,8 @@ export function buildCsv(files: StudentFile[], gradeBoundaries: GradeBoundary[] 
     .filter(f => f.result !== null)
     .map(f => {
       const r = f.result!;
-      const isOverridden = typeof f.teacherOverrideScore === 'number';
-      const effectiveScore = isOverridden ? (f.teacherOverrideScore as number) : r.totalScore;
+      const isOverridden = isScoreOverridden(f);
+      const effectiveScore = getEffectiveTotalScore(f);
       const pct = r.maxTotal > 0 ? effectiveScore / r.maxTotal : 0;
       const grade = computeGradeFromBoundaries(pct, gradeBoundaries);
       return [
@@ -40,7 +41,7 @@ export function buildCsv(files: StudentFile[], gradeBoundaries: GradeBoundary[] 
         r.detectedSubject,
         String(r.questions.length),
         String(r.totalScore),
-        isOverridden ? String(f.teacherOverrideScore) : '',
+        isOverridden ? String(effectiveScore) : '',
         String(r.maxTotal),
         `${Math.round(pct * 100)}%`,
         grade !== null ? String(grade) : '',

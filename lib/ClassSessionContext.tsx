@@ -57,6 +57,7 @@ interface ClassSessionValue {
   updateTeacherFeedback: (id: string, text: string) => void;
   approveFile: (id: string) => void;
   setTeacherOverrideScore: (id: string, score: number | null) => void;
+  setTeacherOverrideQuestionScore: (id: string, questionNumber: number, score: number | null) => void;
   runPipeline: () => Promise<void>;
   handleExport: () => void;
   total: number;
@@ -116,8 +117,24 @@ export function ClassSessionProvider({ children }: { children: React.ReactNode }
     setFiles(prev => prev.map(f => (f.id === id ? { ...f, status: 'teacher-approved' as FileStatus } : f)));
   }, []);
 
+  // Whole-total and per-question overrides are mutually exclusive - each setter clears the
+  // other's data so there's always exactly one unambiguous source for "the final score".
   const setTeacherOverrideScore = useCallback((id: string, score: number | null) => {
-    setFiles(prev => prev.map(f => (f.id === id ? { ...f, teacherOverrideScore: score } : f)));
+    setFiles(prev =>
+      prev.map(f => (f.id === id ? { ...f, teacherOverrideScore: score, teacherOverrideQuestionScores: undefined } : f))
+    );
+  }, []);
+
+  const setTeacherOverrideQuestionScore = useCallback((id: string, questionNumber: number, score: number | null) => {
+    setFiles(prev =>
+      prev.map(f => {
+        if (f.id !== id) return f;
+        const next = { ...(f.teacherOverrideQuestionScores ?? {}) };
+        if (score === null) delete next[questionNumber];
+        else next[questionNumber] = score;
+        return { ...f, teacherOverrideScore: null, teacherOverrideQuestionScores: next };
+      })
+    );
   }, []);
 
   const setStatus = useCallback((id: string, status: FileStatus) => {
@@ -221,6 +238,7 @@ export function ClassSessionProvider({ children }: { children: React.ReactNode }
     updateTeacherFeedback,
     approveFile,
     setTeacherOverrideScore,
+    setTeacherOverrideQuestionScore,
     runPipeline,
     handleExport,
     total,
