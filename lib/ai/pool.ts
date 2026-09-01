@@ -47,7 +47,7 @@ function envModel(provider: ProviderId): string {
   // single request. Override with OPENROUTER_MODEL if OpenRouter's free lineup changes
   // again or you'd rather point this at a paid model.
   if (provider === 'openrouter') return process.env.OPENROUTER_MODEL || 'nvidia/nemotron-3.5-lightning:free';
-  if (provider === 'gemini') return process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+  if (provider === 'gemini') return process.env.GEMINI_MODEL || 'gemini-3.7-flash';
   return process.env.OPENAI_MODEL || 'gpt-4o-mini';
 }
 
