@@ -1,10 +1,8 @@
-export type ProviderId = 'groq' | 'openai' | 'openrouter' | 'gemini';
+export type ProviderId = 'groq' | 'openai';
 
 export const PROVIDER_LABELS: Record<ProviderId, string> = {
   groq: 'Groq',
-  openai: 'OpenAI',
-  openrouter: 'OpenRouter',
-  gemini: 'Gemini'
+  openai: 'OpenAI'
 };
 
 /** One API key/account, loaded from environment variables server-side only. The raw key
